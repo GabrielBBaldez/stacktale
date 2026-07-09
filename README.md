@@ -31,24 +31,24 @@ This is a real report produced by [`DemoApp`](src/test/java/io/github/gabrielbba
 — an order flow where a cache miss returns `null` and nobody checks it:
 
 ```
-━━━ ERROR #9318 ━━━ 2026-07-09 16:21:06.610 thread=main ━━━
+━━━ ERROR #6fd4 ━━━ 2026-07-09 16:33:21.098 thread=main ━━━
 NullPointerException: Cannot invoke "DemoApp$Customer.email()" because "customer" is null
-at DemoApp.confirmOrder(DemoApp.java:55) ← YOUR CODE
+at DemoApp.confirmOrder(DemoApp.java:58) ← YOUR CODE
 log: "Failed to confirm order {}" args=[123] logger=i.g.g.s.d.OrderService
 mdc: traceId=9f3a userId=42
 
-story (traceId=9f3a, last 4 events, 421ms):
-  16:21:06.189 INFO  OrderController  POST /orders/123/confirm
-  16:21:06.301 INFO  CustomerClient   fetching customer 555 → HTTP 404
-  16:21:06.301 WARN  CustomerCache    miss for customer 555, returning null
-  16:21:06.610 ERROR OrderService     Failed to confirm order 123   ← this error
+story (traceId=9f3a, last 4 events, 430ms):
+  16:33:20.668 INFO  OrderController  POST /orders/123/confirm
+  16:33:20.786 INFO  CustomerClient   fetching customer 555 → HTTP 404
+  16:33:20.786 WARN  CustomerCache    miss for customer 555, returning null
+  16:33:21.098 ERROR OrderService     Failed to confirm order 123   ← this error
 
 stack (distilled, 2 of 2 frames):
-  DemoApp.confirmOrder(DemoApp.java:55) ← culprit
-  DemoApp.main(DemoApp.java:44)
+  DemoApp.confirmOrder(DemoApp.java:58) ← culprit
+  DemoApp.main(DemoApp.java:47)
 
 env: app=shop-api 1.4.2 (git 7e3c1f) | java 21.0.6 | windows
-━━━ END #9318 ━━━
+━━━ END #6fd4 ━━━
 ```
 
 Read the `story` section: the root cause — the cache returning `null` on a 404 — is
@@ -59,7 +59,7 @@ happened, with what values, in which environment.
 Meanwhile your console shows a single extra line:
 
 ```
-INFO stacktale -- AI error report #9318 → ./errors-ai.log
+INFO stacktale -- AI error report #6fd4 → ./errors-ai.log
 ```
 
 ## Quickstart
@@ -105,10 +105,36 @@ Works out of the box with **Spring Boot** (Logback is its default logging backen
 | `story` | The last N events from the same request (MDC `traceId`) or thread — the narrative that led to the error |
 | `stack` | Distilled stack: framework runs collapse into `… 39 collapsed (spring ×24, tomcat ×11)` |
 | `env` | App name/version, git sha, Java version, active profile, OS — collected once |
-| repeats | The same error again doesn't dump again: `━ #9318 repeated 47× ━` |
+| repeats | The same error again doesn't dump again: `━ #6fd4 repeated 47× ━` |
 
 Uncaught exceptions (threads dying without any `log.error`) are funneled through the
 same pipeline by an optional handler — useful for plain-Java apps.
+
+## Does it actually help? (blind A/B)
+
+We ran a blind test: [`BlindTestScenario`](src/test/java/io/github/gabrielbbaldez/stacktale/BlindTestScenario.java)
+simulates a checkout that dies on a total-limit sanity check while 6 other request threads
+produce realistic traffic. The true root cause (a stale-price fallback mixing USD prices
+into a BRL order after a pricing-service timeout) never appears in the stack trace — only
+in the events before the error. The SAME run wrote both a classic interleaved log
+(95 lines) and a stacktale report (27 lines). Two fresh AI agents, identical prompts, no
+source access, each got one artifact.
+
+Results, honestly reported:
+
+- **Both found the root cause** — 95 interleaved lines still fit in a strong model's
+  attention, so accuracy tied on this small scenario.
+- **The report needed ~4× less log input** for the same diagnosis, and the agent reading
+  it spent no effort separating 7 threads of noise.
+- The report reader **inferred blast radius from the format itself** (no `repeated N×`
+  lines → single occurrence) — information the classic log doesn't surface.
+- The structural argument stands: a classic log grows with traffic (real production logs
+  don't fit in any context window, and the "last 200 lines" you'd actually paste often cut
+  the crucial WARN); a stacktale report stays ~27 lines per error, with the story already
+  attached.
+
+Reproduce it: run `BlindTestScenario` and hand `target/blind-console.log` vs
+`target/blind-errors-ai.log` to any AI, with the same question.
 
 ## Configuration
 
