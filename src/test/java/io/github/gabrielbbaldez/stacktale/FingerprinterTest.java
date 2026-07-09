@@ -10,7 +10,7 @@ class FingerprinterTest {
     void sameErrorSameIdEvenWithDifferentNumbersInMessage() {
         String a = Fingerprinter.fingerprint("NullPointerException", "OrderService.confirm(OrderService.java:87)", "failed order 123");
         String b = Fingerprinter.fingerprint("NullPointerException", "OrderService.confirm(OrderService.java:87)", "failed order 456");
-        assertThat(a).isEqualTo(b).hasSize(4).matches("[0-9a-f]{4}");
+        assertThat(a).isEqualTo(b).hasSize(8).matches("[0-9a-f]{8}");
     }
 
     @Test
@@ -29,6 +29,6 @@ class FingerprinterTest {
 
     @Test
     void nullSafe() {
-        assertThat(Fingerprinter.fingerprint(null, null, null)).hasSize(4);
+        assertThat(Fingerprinter.fingerprint(null, null, null)).hasSize(8);
     }
 }

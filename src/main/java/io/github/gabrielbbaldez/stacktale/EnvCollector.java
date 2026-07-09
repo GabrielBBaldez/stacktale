@@ -22,7 +22,13 @@ final class EnvCollector {
     String envLine() {
         String line = cached;
         if (line == null) {
-            line = build();
+            try {
+                line = build();
+            } catch (Throwable t) {
+                // env info is best-effort: cache a minimal line so one bad metadata file
+                // can never keep killing full reports for the lifetime of the app
+                line = "app=? | java " + System.getProperty("java.version", "?");
+            }
             cached = line;
         }
         return line;
@@ -53,8 +59,9 @@ final class EnvCollector {
         Properties p = new Properties();
         try (InputStream in = classLoader.getResourceAsStream(resource)) {
             if (in != null) p.load(in);
-        } catch (IOException ignored) {
-            // env info is best-effort; never fail the pipeline over it
+        } catch (Exception ignored) {
+            // not just IOException: Properties.load throws IllegalArgumentException on
+            // malformed \\uXXXX escapes; env info is best-effort either way
         }
         return p;
     }

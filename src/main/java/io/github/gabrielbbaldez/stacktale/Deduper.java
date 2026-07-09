@@ -52,4 +52,13 @@ final class Deduper {
         }
         return new Decision(Kind.SILENT, s.count, now);
     }
+
+    /**
+     * A REPORT decision was handed out but the report could not be written (e.g. a
+     * transient I/O failure). Forget the fingerprint so the next occurrence gets a fresh
+     * REPORT instead of being silently summarized for the rest of the window.
+     */
+    synchronized void rollback(String fingerprint) {
+        stats.remove(fingerprint);
+    }
 }

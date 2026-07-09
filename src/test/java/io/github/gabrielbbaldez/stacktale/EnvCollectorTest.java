@@ -38,4 +38,15 @@ class EnvCollectorTest {
         String line = new EnvCollector(empty).envLine();
         assertThat(line).startsWith("app=?").doesNotContain("git").contains("java ");
     }
+
+    @Test
+    void survivesMalformedPropertiesFile(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        // Properties.load throws IllegalArgumentException (not IOException) on a broken \-u escape
+        java.nio.file.Files.writeString(dir.resolve("git.properties"), "git.commit.id.abbrev=\\uZZZZ");
+        try (URLClassLoader cl = new URLClassLoader(new URL[]{dir.toUri().toURL()}, null)) {
+            EnvCollector collector = new EnvCollector(cl);
+            org.assertj.core.api.Assertions.assertThatCode(collector::envLine).doesNotThrowAnyException();
+            assertThat(collector.envLine()).contains("java ");
+        }
+    }
 }

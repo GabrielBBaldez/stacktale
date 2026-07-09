@@ -105,6 +105,22 @@ class StacktaleAppenderIntegrationTest {
     }
 
     @Test
+    void invalidFilePathDegradesToNoOpInsteadOfBreakingStartup(@TempDir Path dir) {
+        ctx = new LoggerContext();
+        ctx.setMDCAdapter(MDC.getMDCAdapter());
+        StacktaleAppender appender = new StacktaleAppender();
+        appender.setContext(ctx);
+        appender.setFile("bad\0path.log"); // NUL is invalid on every filesystem
+        appender.setInstallUncaughtHandler(false);
+        appender.start(); // must not throw — a broken config cannot break app startup
+        ctx.getLogger(Logger.ROOT_LOGGER_NAME).addAppender(appender);
+        ctx.getLogger(Logger.ROOT_LOGGER_NAME).setLevel(Level.INFO);
+
+        ctx.getLogger("com.acme.X").error("boom", new RuntimeException("x")); // no-op, no throw
+        assertThat(appender.isStarted()).isTrue();
+    }
+
+    @Test
     void ignoresItsOwnPointerLogger(@TempDir Path dir) throws Exception {
         Path file = dir.resolve("errors-ai.log");
         startAppender(file, "");

@@ -46,6 +46,7 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
     private ReportWriter writer;
     private org.slf4j.Logger selfLogger;
     private final AtomicBoolean warnedOnce = new AtomicBoolean();
+    private final AtomicBoolean announced = new AtomicBoolean();
 
     @Override
     public void start() {
@@ -61,7 +62,14 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
         deduper = new Deduper(dedupWindowSeconds * 1000L, 60_000, System::currentTimeMillis);
         env = new EnvCollector(Thread.currentThread().getContextClassLoader());
         renderer = new ReportRenderer(zoneId);
-        writer = new ReportWriter(Path.of(file), maxFileSizeMb * 1024L * 1024L, renderer.fileHeader());
+        try {
+            writer = new ReportWriter(Path.of(file), maxFileSizeMb * 1024L * 1024L, renderer.fileHeader());
+        } catch (RuntimeException e) {
+            // e.g. InvalidPathException from a value the OS rejects: a broken stacktale
+            // config must degrade to a no-op, never break application startup
+            addWarn("invalid <file> '" + file + "', stacktale disabled", e);
+            writer = null;
+        }
         // Log through this appender's own context: during application boot start() runs in
         // the middle of SLF4J initialization, and the global LoggerFactory is not safe yet
         // (and would be the wrong context in multi-context environments).
@@ -69,14 +77,20 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
                 ? lc.getLogger(SELF_LOGGER)
                 : LoggerFactory.getLogger(SELF_LOGGER);
         super.start();
-        selfLogger.info("stacktale active → {} (error reports for AI consumption)", file);
+        // Status message always works; the logger announcement is deferred to the first
+        // event because during Joran config no appender-ref is attached to any logger yet.
+        addInfo("stacktale active → " + file + " (error reports for AI consumption)");
         if (installUncaughtHandler) UncaughtHandler.install();
     }
 
     @Override
     protected void append(ILoggingEvent event) {
         try {
-            if (SELF_LOGGER.equals(event.getLoggerName())) return;
+            if (writer == null || SELF_LOGGER.equals(event.getLoggerName())) return;
+            if (announced.compareAndSet(false, true)) {
+                // deferred from start(): by now appender-refs are wired, so this reaches the console
+                selfLogger.info("stacktale active → {} (error reports for AI consumption)", file);
+            }
             storyBuffer.record(event);
             if (!event.getLevel().isGreaterOrEqual(Level.ERROR)) return;
 
@@ -91,10 +105,17 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
             Decision decision = deduper.decide(fingerprint);
             switch (decision.kind()) {
                 case REPORT -> {
-                    Report report = new Report(fingerprint, event.getTimeStamp(), event.getThreadName(),
-                            stack, event.getMessage(), event.getArgumentArray(), event.getLoggerName(),
-                            StoryBuffer.safeMdc(event), storyBuffer.storyFor(event), env.envLine());
-                    writer.append(renderer.render(report));
+                    try {
+                        Report report = new Report(fingerprint, event.getTimeStamp(), event.getThreadName(),
+                                stack, event.getMessage(), event.getArgumentArray(), event.getLoggerName(),
+                                StoryBuffer.safeMdc(event), storyBuffer.storyFor(event), env.envLine());
+                        writer.append(renderer.render(report));
+                    } catch (Throwable t) {
+                        // don't leave the dedup window believing a report exists that was
+                        // never written — the next occurrence must get a fresh chance
+                        deduper.rollback(fingerprint);
+                        throw t;
+                    }
                     selfLogger.info("AI error report #{} → {}", fingerprint, file);
                 }
                 case SUMMARY -> writer.append(

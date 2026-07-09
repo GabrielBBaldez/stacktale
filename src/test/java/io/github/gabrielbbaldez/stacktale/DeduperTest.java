@@ -46,4 +46,16 @@ class DeduperTest {
         d.decide("a1");
         assertThat(d.decide("b2").kind()).isEqualTo(Kind.REPORT);
     }
+
+    @Test
+    void rollbackGivesTheNextOccurrenceAFreshReport() {
+        AtomicLong now = new AtomicLong(0);
+        Deduper d = new Deduper(300_000, 60_000, now::get);
+
+        assertThat(d.decide("a1").kind()).isEqualTo(Kind.REPORT);
+        d.rollback("a1"); // the report write failed
+        now.set(1_000);
+        // without rollback this would be SUMMARY; the error must get a fresh chance
+        assertThat(d.decide("a1").kind()).isEqualTo(Kind.REPORT);
+    }
 }

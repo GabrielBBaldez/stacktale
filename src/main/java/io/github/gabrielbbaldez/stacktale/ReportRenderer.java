@@ -71,7 +71,7 @@ final class ReportRenderer {
             sb.append("stack (distilled, ").append(stack.shownFrames()).append(" of ")
                     .append(stack.totalFrames()).append(" frames):\n");
             for (String line : stack.frameLines()) sb.append("  ").append(line).append('\n');
-            for (String line : stack.suppressed()) sb.append("  ").append(line).append('\n');
+            for (String line : stack.suppressed()) sb.append("  ").append(flat(line)).append('\n');
         }
 
         sb.append('\n');

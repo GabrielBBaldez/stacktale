@@ -99,8 +99,9 @@ Format decisions:
 - **story** = events leading up to and including the error (the error itself is the last
   line, marked `← this error`), oldest first, from the same correlation context (MDC trace
   key when present, otherwise same thread), within a time window.
-- **Report ID** = first 4 hex chars of the error fingerprint. Stable across repeats,
-  referenced by the console pointer line.
+- **Report ID** = first 8 hex chars (32 bits) of the error fingerprint. Stable across
+  repeats, referenced by the console pointer line. (16 bits would collide with ~50%
+  probability at ~300 distinct errors — birthday bound vs. the 1024-entry dedup map.)
 - **Repeats** don't produce new blocks. A throttled summary line is appended instead:
   `━ #a1b2 repeated 47× (last 14:37:22) ━`.
 - ERROR events **without** a throwable still produce a report (message + story still tell
@@ -179,6 +180,10 @@ On start, stacktale announces itself once (via logger `stacktale`):
 4. **Same trust boundary as existing logs.** stacktale writes what the app already logs
    (plus manifest/env metadata) to a file next to the existing logs. No network, no
    phone-home, nothing leaves the machine.
+5. **File order ≈ report order, not guaranteed.** Under a concurrent burst of the same
+   error, a cheap `repeated N×` summary can win the writer lock before the full report
+   block it refers to. No data is lost; embedded timestamps give the true order. Accepted
+   trade-off to keep the error path lock-light.
 
 ## 7. Testing strategy
 

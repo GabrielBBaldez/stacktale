@@ -82,7 +82,7 @@ class ConcurrentLoggingTest {
         assertThat(reports).isEqualTo(4);
 
         // every block is whole: ERROR #id ... END #id in strict pairs, never interleaved
-        Pattern delimiter = Pattern.compile("^━+ (ERROR|END) #([0-9a-f]{4})", Pattern.MULTILINE);
+        Pattern delimiter = Pattern.compile("^━+ (ERROR|END) #([0-9a-f]{8})", Pattern.MULTILINE);
         Matcher m = delimiter.matcher(content);
         String openId = null;
         while (m.find()) {
