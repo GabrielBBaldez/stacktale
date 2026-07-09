@@ -135,7 +135,7 @@ log event ──► StacktaleAppender.append()
 | `StackDistiller` | Walks the throwable chain; classifies frames (app vs framework via configurable prefixes); finds root cause + culprit frame; collapses framework runs with per-group counts; dedups repeated caused-by frames; renders suppressed exceptions as one line each |
 | `Fingerprinter` | SHA-1 → short id over (root exception type + culprit frame + message with digits normalized) |
 | `Deduper` | Fingerprint → (count, lastSeen) map with time window (default 5 min); decides report vs counter; throttles summary lines (≥60s apart) |
-| `EnvCollector` | Lazy, cached once: app name/version (`Implementation-Title/Version` manifest, `build-info.properties`), git sha (`git.properties`), java version, os, active profile (`spring.profiles.active` sysprop/env) |
+| `EnvCollector` | Lazy, cached once: app name/version (`stacktale.app.*` sysprops, then Spring Boot `build-info.properties`), git sha (`git.properties`), java version, os, active profile (`spring.profiles.active` sysprop/env). Manifest scanning was dropped: picking the wrong jar's manifest is worse than showing `?` |
 | `ReportRenderer` | Pure function: assembles the `st/1` block from parts. Golden-file tested |
 | `ReportWriter` | Appends UTF-8 to `errors-ai.log` (creating it with the self-describing header); immediate flush; size-based rotation (default 5 MB, keep 1 backup); synchronized |
 | `UncaughtHandler` | Optional `Thread.setDefaultUncaughtExceptionHandler` wrapper: delegates to any pre-existing handler, and logs the throwable via logger `stacktale.uncaught` so it flows through the normal pipeline. Covers plain-Java apps where exceptions die without a `log.error` |
