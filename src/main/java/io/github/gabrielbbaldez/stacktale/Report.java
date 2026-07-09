@@ -12,6 +12,7 @@ public record Report(
         Object[] args,
         String loggerName,
         Map<String, String> mdc,
+        Map<String, String> fields,
         Story story,
         String envLine
 ) {}

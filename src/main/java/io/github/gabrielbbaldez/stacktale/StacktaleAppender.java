@@ -37,6 +37,7 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
     private boolean truncateOnStart = false;
     private boolean installUncaughtHandler = true;
     private boolean reportErrorsWithoutThrowable = true;
+    private boolean captureExceptionFields = true;
     private String correlationMdcKeys = "traceId,correlationId,requestId";
     private String zone = "";
 
@@ -112,7 +113,8 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
                     try {
                         Report report = new Report(fingerprint, event.getTimeStamp(), event.getThreadName(),
                                 stack, event.getMessage(), event.getArgumentArray(), event.getLoggerName(),
-                                StoryBuffer.safeMdc(event), storyBuffer.storyFor(event), env.envLine());
+                                StoryBuffer.safeMdc(event), exceptionFields(proxy),
+                                storyBuffer.storyFor(event), env.envLine());
                         writer.append(renderer.render(report));
                     } catch (Throwable t) {
                         // don't leave the dedup window believing a report exists that was
@@ -131,6 +133,19 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
                 addWarn("stacktale failed to process an event; further failures are silent", t);
             }
         }
+    }
+
+    /** State off the root-cause exception's own getters/fields — see {@link FieldExtractor}. */
+    private java.util.Map<String, String> exceptionFields(IThrowableProxy proxy) {
+        if (!captureExceptionFields || !(proxy instanceof ch.qos.logback.classic.spi.ThrowableProxy tp)) {
+            return java.util.Map.of();
+        }
+        Throwable cur = tp.getThrowable();
+        java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        while (cur != null && cur.getCause() != null && seen.add(cur) && seen.size() < 10) {
+            cur = cur.getCause();
+        }
+        return FieldExtractor.extract(cur);
     }
 
     private static List<String> csv(String s) {
@@ -159,6 +174,8 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
     public void setInstallUncaughtHandler(boolean installUncaughtHandler) { this.installUncaughtHandler = installUncaughtHandler; }
 
     public void setReportErrorsWithoutThrowable(boolean reportErrorsWithoutThrowable) { this.reportErrorsWithoutThrowable = reportErrorsWithoutThrowable; }
+
+    public void setCaptureExceptionFields(boolean captureExceptionFields) { this.captureExceptionFields = captureExceptionFields; }
 
     public void setCorrelationMdcKeys(String correlationMdcKeys) { this.correlationMdcKeys = correlationMdcKeys; }
 

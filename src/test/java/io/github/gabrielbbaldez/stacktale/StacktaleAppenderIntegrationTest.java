@@ -104,6 +104,21 @@ class StacktaleAppenderIntegrationTest {
         assertThat(appender.isStarted()).isTrue();
     }
 
+    static class GatewayException extends RuntimeException {
+        GatewayException(String msg) { super(msg); }
+        public int getStatusCode() { return 502; }
+        public boolean isRetryable() { return true; }
+    }
+
+    @Test
+    void exceptionFieldsAppearInReport(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("errors-ai.log");
+        startAppender(file, "");
+        ctx.getLogger("com.acme.Gw").error("gateway call failed", new GatewayException("bad gateway"));
+        String content = Files.readString(file, StandardCharsets.UTF_8);
+        assertThat(content).contains("fields: retryable=true statusCode=502");
+    }
+
     @Test
     void invalidFilePathDegradesToNoOpInsteadOfBreakingStartup(@TempDir Path dir) {
         ctx = new LoggerContext();

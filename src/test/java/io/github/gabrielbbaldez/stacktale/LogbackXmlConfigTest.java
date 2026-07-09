@@ -44,6 +44,7 @@ class LogbackXmlConfigTest {
                     <truncateOnStart>false</truncateOnStart>
                     <installUncaughtHandler>false</installUncaughtHandler>
                     <reportErrorsWithoutThrowable>true</reportErrorsWithoutThrowable>
+                    <captureExceptionFields>true</captureExceptionFields>
                     <correlationMdcKeys>traceId</correlationMdcKeys>
                     <zone>UTC</zone>
                   </appender>

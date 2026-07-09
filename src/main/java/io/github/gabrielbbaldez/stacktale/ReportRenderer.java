@@ -64,6 +64,12 @@ final class ReportRenderer {
             sb.append('\n');
         }
 
+        if (r.fields() != null && !r.fields().isEmpty()) {
+            sb.append("fields:");
+            new TreeMap<>(r.fields()).forEach((k, v) -> sb.append(' ').append(flat(k)).append('=').append(flat(v)));
+            sb.append('\n');
+        }
+
         renderStory(sb, r);
 
         if (stack != null) {
@@ -90,6 +96,7 @@ final class ReportRenderer {
                 # AI-oriented error reports (format st/1, https://github.com/GabrielBBaldez/stacktale)
                 # Each report is delimited by "━━━ ERROR #<id> ━━━" ... "━━━ END #<id> ━━━".
                 # Sections: headline (root cause first), at (culprit frame), log, mdc,
+                # fields (state carried by the exception's own getters/fields),
                 # story (events leading up to and including the error, oldest first),
                 # stack (distilled; framework frames collapsed), env. "← YOUR CODE" marks app frames.
                 # Repeated errors append "━ #<id> repeated N× ━" lines instead of new reports.

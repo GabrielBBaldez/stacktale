@@ -37,7 +37,7 @@ class ReportRendererTest {
         ), "thread http-nio-8080-exec-3");
         Report r = new Report("a1b2", 1_000_412L, "http-nio-8080-exec-3", stack,
                 "Failed to confirm order {}", new Object[]{123}, "com.acme.shop.OrderService",
-                Map.of("traceId", "9f3a", "userId", "42"), story,
+                Map.of("traceId", "9f3a", "userId", "42"), Map.of(), story,
                 "app=shop-api 1.4.2 (git 7e3c1f) | java 21 | profile=dev | linux");
 
         String rendered = new ReportRenderer(ZoneOffset.UTC).render(r);
@@ -52,11 +52,21 @@ class ReportRendererTest {
         ), "thread main");
         Report r = new Report("beef", 2_000_000L, "main", null,
                 "payment rejected for order {}", new Object[]{77}, "com.acme.PaymentService",
-                Map.of(), story, "app=? | java 21 | linux");
+                Map.of(), Map.of(), story, "app=? | java 21 | linux");
 
         String rendered = new ReportRenderer(ZoneOffset.UTC).render(r);
 
         assertThat(rendered).isEqualTo(golden("no-throwable.txt"));
+    }
+
+    @Test
+    void fieldsLineRenderedSortedAndFlattened() {
+        Report r = new Report("cafe", 1_000_000L, "main", null,
+                "boom", null, "com.acme.Svc", Map.of(),
+                Map.of("orderId", "889", "note", "with\nnewline"),
+                new Story(List.of(), "thread main"), "app=? | java 21 | linux");
+        String rendered = new ReportRenderer(ZoneOffset.UTC).render(r);
+        assertThat(rendered).contains("fields: note=with\\nnewline orderId=889");
     }
 
     @Test
