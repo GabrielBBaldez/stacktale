@@ -5,6 +5,30 @@ All notable changes to stacktale are documented here. The format follows
 [SemVer](https://semver.org/). The report format (`st/1`) is versioned independently
 and pinned by golden-file tests.
 
+## [0.3.1] — 2026-07-10
+
+Patch release — fixes a critical agent startup bug in 0.3.0. **If you use
+`stacktale-agent`, upgrade.** (The core, logback, log4j2, starter and mcp artifacts are
+functionally unchanged from 0.3.0; only bug fixes.)
+
+- **CRITICAL (agent)**: `stacktale-agent-0.3.0` aborts the JVM at startup when attached as
+  documented — its manifest declared `Can-Retransform-Classes=false` while the code
+  requested retransformation, and `premain` didn't guard against it. Fixed: the manifest
+  allows retransform, installation degrades gracefully when the runtime doesn't support
+  it, and `premain` disables the agent instead of propagating. A packaging integration
+  test now guards the manifest contract.
+- **Agent**: package matching now respects package boundaries (`packages=com.a.orders`
+  no longer instruments `com.a.ordersprocessing`).
+- **Pipeline**: a failing report shipper (`emitReportsToLogger`) no longer rolls back
+  dedup state after the report was already written (which duplicated the next report).
+- **WebFlux filter**: guarded against `MDC.put` throwing on a partial SLF4J binding — it
+  can no longer fail the HTTP request.
+- **MCP**: scans all contiguous rotated backups (not just `.1`–`.9`); unknown methods
+  return JSON-RPC `-32601`.
+- **Dedup**: repeat counts are marked written only after a successful append.
+
+[0.3.1]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.3.1
+
 ## [0.3.0] — 2026-07-10
 
 The "capture everything, everywhere" release — closes the entire original backlog.
