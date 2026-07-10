@@ -146,6 +146,28 @@ itself on startup, and the file header explains the format to any AI that opens 
 Same pipeline, same st/1 format, story correlation via `ThreadContext` — both backends
 share `stacktale-core`.
 
+### java.util.logging (JUL) / System.Logger
+
+For apps that log through the JDK's own logging — or `System.Logger`, which routes to JUL
+by default — with no SLF4J bridge:
+
+```xml
+<dependency>
+  <groupId>io.github.gabrielbbaldez</groupId>
+  <artifactId>stacktale-jul</artifactId>
+  <version>0.5.0</version>
+</dependency>
+```
+
+```properties
+# logging.properties
+handlers = io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.appPackages = com.your.app
+```
+
+`SEVERE` records become reports; lower levels feed the story (which correlates by thread,
+since JUL has no MDC). No extra dependency — JUL is in the JDK.
+
 ## What gets captured
 
 | Section | What it is |
@@ -356,6 +378,7 @@ path as well as the classpath — a resolution smoke test in CI pins this:
 | `stacktale-core` | `io.github.gabrielbbaldez.stacktale` |
 | `stacktale` (Logback) | `io.github.gabrielbbaldez.stacktale.logback` |
 | `stacktale-log4j2` | `io.github.gabrielbbaldez.stacktale.log4j2` |
+| `stacktale-jul` | `io.github.gabrielbbaldez.stacktale.jul` |
 | `stacktale-spring-boot-starter` | `io.github.gabrielbbaldez.stacktale.spring` |
 | `stacktale-mcp` | `io.github.gabrielbbaldez.stacktale.mcp` |
 | `stacktale-agent` | `io.github.gabrielbbaldez.stacktale.agent` |

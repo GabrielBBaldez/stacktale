@@ -40,6 +40,7 @@
     <module>stacktale-core</module>
     <module>stacktale</module>
     <module>stacktale-log4j2</module>
+    <module>stacktale-jul</module>
     <module>stacktale-spring-boot-starter</module>
     <module>stacktale-mcp</module>
     <module>stacktale-agent</module>
