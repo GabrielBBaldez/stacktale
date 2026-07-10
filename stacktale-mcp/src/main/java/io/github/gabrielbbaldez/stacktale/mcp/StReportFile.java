@@ -73,7 +73,13 @@ final class StReportFile {
                 block.append(line).append('\n');
                 if (headline == null && !line.isBlank()) headline = line;
                 if (line.startsWith("━━━ END #")) {
-                    byId.put(id, new StReport(id, timestamp, headline, 1, block.toString()));
+                    // the same fingerprint can produce a second full block after the dedup
+                    // window expires — carry forward the earlier count and keep the earliest
+                    // timestamp instead of silently resetting recurrence to 1
+                    StReport prior = byId.get(id);
+                    int repeats = prior == null ? 1 : Math.max(prior.repeats(), 1);
+                    String firstTs = prior == null ? timestamp : prior.timestamp();
+                    byId.put(id, new StReport(id, firstTs, headline, repeats, block.toString()));
                     block = null;
                 }
                 continue;

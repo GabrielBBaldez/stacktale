@@ -76,6 +76,7 @@ public class StacktaleAutoConfiguration {
         appender.setEchoSuppressionMillis(props.getEchoSuppressionMillis());
         props.getContainerLoggers().forEach(appender::addContainerLogger);
         appender.setEmitReportsToLogger(props.isEmitReportsToLogger());
+        appender.setMaxReportsPerMinute(props.getMaxReportsPerMinute());
         appender.start();
         root.addAppender(appender);
 

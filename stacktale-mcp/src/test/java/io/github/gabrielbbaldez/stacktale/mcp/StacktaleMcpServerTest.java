@@ -124,6 +124,31 @@ class StacktaleMcpServerTest {
     }
 
     @Test
+    void recurrenceSurvivesASecondBlockOfTheSameFingerprint(@TempDir Path dir) throws Exception {
+        // the same error reported twice (dedup window expired between) — the MCP view must
+        // not reset its recurrence to 1 and must keep the earliest timestamp
+        Path f = dir.resolve("errors-ai.log");
+        Files.writeString(f, """
+                ━━━ ERROR #dupe1234 ━━━ 2026-07-10 09:00:00.000 thread=main ━━━
+                RuntimeException: recurring
+                ━━━ END #dupe1234 ━━━
+                ━ #dupe1234 repeated 3× (last 09:00:05.000) ━
+                ━━━ ERROR #dupe1234 ━━━ 2026-07-10 09:30:00.000 thread=main ━━━
+                RuntimeException: recurring
+                ━━━ END #dupe1234 ━━━
+                """, StandardCharsets.UTF_8);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        new StacktaleMcpServer(f).serve(new ByteArrayInputStream(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"list_errors\",\"arguments\":{}}}\n"
+                        .getBytes(StandardCharsets.UTF_8)), out);
+        String text = JSON.readTree(out.toString(StandardCharsets.UTF_8).trim())
+                .at("/result/content/0/text").asText();
+        assertThat(text).contains("(×3)");                 // count carried forward, not reset to 1
+        assertThat(text).contains("2026-07-10 09:00:00");  // earliest timestamp kept
+    }
+
+    @Test
     void getReportReturnsTheFullBlock() throws Exception {
         JsonNode[] r = roundTrip(
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"get_report\",\"arguments\":{\"id\":\"aaaa1111\"}}}");

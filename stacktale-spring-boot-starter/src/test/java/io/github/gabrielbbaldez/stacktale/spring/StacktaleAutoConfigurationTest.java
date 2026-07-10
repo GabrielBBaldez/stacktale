@@ -37,6 +37,24 @@ class StacktaleAutoConfigurationTest {
     }
 
     @Test
+    void everyPropertyReachesTheAppender() {
+        // guards against the settings-sprawl gap: a property declared but never wired is a
+        // silent no-op for the zero-config user (maxReportsPerMinute was exactly that)
+        runner.withPropertyValues(
+                "stacktale.file=target/props-test.log",
+                "stacktale.max-reports-per-minute=42",
+                "stacktale.story-size=7",
+                "stacktale.emit-reports-to-logger=true").run(context -> {
+            io.github.gabrielbbaldez.stacktale.spring.StacktaleProperties props =
+                    context.getBean(io.github.gabrielbbaldez.stacktale.spring.StacktaleProperties.class);
+            assertThat(props.getMaxReportsPerMinute()).isEqualTo(42);
+            assertThat(props.getStorySize()).isEqualTo(7);
+            assertThat(props.isEmitReportsToLogger()).isTrue();
+            assertThat(context).hasSingleBean(StacktaleAppender.class);
+        });
+    }
+
+    @Test
     void masterSwitchDisablesEverything() {
         runner.withPropertyValues("stacktale.enabled=false").run(context -> {
             assertThat(context).doesNotHaveBean(StacktaleAppender.class);
