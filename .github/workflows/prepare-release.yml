@@ -1,0 +1,64 @@
+name: Prepare release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (e.g. 0.4.0)
+        required: true
+      nextSnapshot:
+        description: Next dev version (e.g. 0.5.0-SNAPSHOT) — leave blank to auto-bump minor
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Compute next snapshot
+        id: next
+        run: |
+          NEXT="${{ inputs.nextSnapshot }}"
+          if [ -z "$NEXT" ]; then
+            IFS='.' read -r MA MI PA <<< "${{ inputs.version }}"
+            NEXT="${MA}.$((MI + 1)).0-SNAPSHOT"
+          fi
+          echo "value=$NEXT" >> "$GITHUB_OUTPUT"
+
+      - name: Set release version
+        run: mvn -B -q versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+
+      - name: Verify the release build
+        run: mvn -B -Prelease verify
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Update README versions
+        run: |
+          sed -i -E 's|(<artifactId>stacktale[a-z0-9-]*</artifactId>\s*<version>)[0-9.]+(</version>)|\1${{ inputs.version }}\2|g' README.md || true
+          sed -i -E 's|(io\.github\.gabrielbbaldez</groupId>\s*<artifactId>stacktale[a-z0-9-]*</artifactId>\s*<version>)[0-9.]+|\1${{ inputs.version }}|g' README.md || true
+
+      - name: Commit, tag and open next snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "release: ${{ inputs.version }}"
+          git tag -a "v${{ inputs.version }}" -m "stacktale ${{ inputs.version }}"
+          mvn -B -q versions:set -DnewVersion=${{ steps.next.outputs.value }} -DgenerateBackupPoms=false
+          git commit -am "chore: open ${{ steps.next.outputs.value }}"
+          git push origin HEAD --tags
+
+      - name: Summary
+        run: |
+          echo "Tagged **v${{ inputs.version }}** (the release workflow publishes it to Central) and opened **${{ steps.next.outputs.value }}**." >> "$GITHUB_STEP_SUMMARY"
+          echo "Remember to write the GitHub release notes and the CHANGELOG entry." >> "$GITHUB_STEP_SUMMARY"

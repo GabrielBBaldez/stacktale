@@ -38,8 +38,10 @@ public final class StacktaleMcpServer {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final StReportFile reports;
+    private final Path file;
 
     StacktaleMcpServer(Path file) {
+        this.file = file;
         this.reports = new StReportFile(file);
     }
 
@@ -51,9 +53,17 @@ public final class StacktaleMcpServer {
         new StacktaleMcpServer(file).serve(System.in, System.out);
     }
 
+    /** The single resource this server exposes: the live error report file. */
+    static final String RESOURCE_URI = "stacktale://reports";
+
+    private PrintStream writer;
+    private final Object writeLock = new Object();
+    private volatile boolean subscribed;
+    private Thread watcherThread;
+
     void serve(InputStream in, OutputStream out) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-        PrintStream writer = new PrintStream(out, true, StandardCharsets.UTF_8);
+        this.writer = new PrintStream(out, true, StandardCharsets.UTF_8);
         String line;
         while ((line = reader.readLine()) != null) {
             if (line.isBlank()) continue;
@@ -80,7 +90,21 @@ public final class StacktaleMcpServer {
                 error.put("code", -32603); // Internal error
                 error.put("message", String.valueOf(e.getMessage()));
             }
-            writer.println(JSON.writeValueAsString(response));
+            send(response);
+        }
+        subscribed = false;
+        if (watcherThread != null) watcherThread.interrupt();
+    }
+
+    /** Serializes every write to stdout so watcher notifications never interleave with responses. */
+    private void send(ObjectNode message) {
+        try {
+            String json = JSON.writeValueAsString(message);
+            synchronized (writeLock) {
+                writer.println(json);
+            }
+        } catch (Exception ignored) {
+            // a serialization failure must not kill the read loop
         }
     }
 
@@ -93,6 +117,10 @@ public final class StacktaleMcpServer {
             case "initialize" -> initialize();
             case "tools/list" -> toolsList();
             case "tools/call" -> toolsCall(params);
+            case "resources/list" -> resourcesList();
+            case "resources/read" -> resourcesRead(params);
+            case "resources/subscribe" -> resourcesSubscribe();
+            case "resources/unsubscribe" -> resourcesUnsubscribe();
             case "ping" -> JSON.createObjectNode();
             default -> throw new UnknownMethodException("unknown method: " + method);
         };
@@ -101,11 +129,83 @@ public final class StacktaleMcpServer {
     private JsonNode initialize() {
         ObjectNode result = JSON.createObjectNode();
         result.put("protocolVersion", PROTOCOL_VERSION);
-        result.putObject("capabilities").putObject("tools");
+        ObjectNode capabilities = result.putObject("capabilities");
+        capabilities.putObject("tools");
+        // resources with subscribe: the AI is TOLD when a new error lands, it doesn't poll
+        ObjectNode res = capabilities.putObject("resources");
+        res.put("subscribe", true);
+        res.put("listChanged", false);
         ObjectNode info = result.putObject("serverInfo");
         info.put("name", "stacktale");
-        info.put("version", "0.3.0");
+        info.put("version", "0.4.0");
         return result;
+    }
+
+    private JsonNode resourcesList() {
+        ObjectNode result = JSON.createObjectNode();
+        ObjectNode resource = result.putArray("resources").addObject();
+        resource.put("uri", RESOURCE_URI);
+        resource.put("name", "Error reports");
+        resource.put("description", "The live stacktale error report file — subscribe to be notified of new errors.");
+        resource.put("mimeType", "text/plain");
+        return result;
+    }
+
+    private JsonNode resourcesRead(JsonNode params) throws IOException {
+        String uri = params.path("uri").asText();
+        ObjectNode result = JSON.createObjectNode();
+        ObjectNode contents = result.putArray("contents").addObject();
+        contents.put("uri", uri);
+        contents.put("mimeType", "text/plain");
+        contents.put("text", listErrors(50)); // the "what's there now" view; get_report for full blocks
+        return result;
+    }
+
+    private JsonNode resourcesSubscribe() {
+        subscribed = true;
+        startWatcher();
+        return JSON.createObjectNode();
+    }
+
+    private JsonNode resourcesUnsubscribe() {
+        subscribed = false;
+        return JSON.createObjectNode();
+    }
+
+    /** Watches the report file's directory and pushes an updated-notification when it changes. */
+    private synchronized void startWatcher() {
+        if (watcherThread != null && watcherThread.isAlive()) return;
+        watcherThread = new Thread(this::watchLoop, "stacktale-mcp-watch");
+        watcherThread.setDaemon(true);
+        watcherThread.start();
+    }
+
+    private void watchLoop() {
+        java.nio.file.Path dir = file.toAbsolutePath().getParent();
+        if (dir == null) return;
+        try (java.nio.file.WatchService ws = dir.getFileSystem().newWatchService()) {
+            dir.register(ws, java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY,
+                    java.nio.file.StandardWatchEventKinds.ENTRY_CREATE);
+            String target = file.getFileName().toString();
+            while (subscribed && !Thread.currentThread().isInterrupted()) {
+                java.nio.file.WatchKey key = ws.poll(1, java.util.concurrent.TimeUnit.SECONDS);
+                if (key == null) continue;
+                boolean changed = key.pollEvents().stream()
+                        .anyMatch(e -> target.equals(String.valueOf(e.context())));
+                key.reset();
+                if (changed && subscribed) notifyResourceUpdated();
+            }
+        } catch (Exception ignored) {
+            // the watcher is best-effort; failing it never affects the request loop
+        }
+    }
+
+    private void notifyResourceUpdated() {
+        ObjectNode note = JSON.createObjectNode();
+        note.put("jsonrpc", "2.0");
+        note.put("method", "notifications/resources/updated");
+        note.putObject("params").put("uri", RESOURCE_URI);
+        send(note);
     }
 
     private JsonNode toolsList() {

@@ -33,8 +33,8 @@ public final class StacktaleAgent {
     private StacktaleAgent() {}
 
     public static void premain(String agentArgs, Instrumentation instrumentation) {
-        List<String> packages = parsePackages(agentArgs);
-        if (packages.isEmpty()) {
+        Config config = Config.parse(agentArgs);
+        if (config.packages().isEmpty()) {
             System.err.println("[stacktale-agent] no packages configured — "
                     + "use -javaagent:stacktale-agent.jar=packages=com.your.app (';' separates multiple). Agent inactive.");
             return;
@@ -42,20 +42,31 @@ public final class StacktaleAgent {
         // An exception out of premain aborts the JVM per the java.lang.instrument spec:
         // a broken agent must disable itself, never take down a healthy application.
         try {
-            install(instrumentation, packages);
-            System.err.println("[stacktale-agent] capturing throw-site arguments in packages " + packages);
+            install(instrumentation, config);
+            System.err.println("[stacktale-agent] capturing throw-site arguments in " + config.packages()
+                    + (config.excludes().isEmpty() ? "" : " (excluding " + config.excludes() + ")"));
         } catch (Throwable t) {
             System.err.println("[stacktale-agent] failed to install, running without capture: " + t);
         }
     }
 
-    /** Shared by premain and tests (which attach via ByteBuddyAgent). */
+    /** Convenience for the common case; see {@link #install(Instrumentation, Config)}. */
     public static void install(Instrumentation instrumentation, List<String> packages) {
+        install(instrumentation, new Config(packages, List.of(), 5, 60, true));
+    }
+
+    /** Shared by premain and tests (which attach via ByteBuddyAgent). */
+    public static void install(Instrumentation instrumentation, Config config) {
+        CaptureRegistry.configure(config.maxFrames(), config.maxValueLength(), config.renderToString());
+
         ElementMatcher.Junction<TypeDescription> types = ElementMatchers.none();
-        for (String pkg : packages) {
+        for (String pkg : config.packages()) {
             // require a package boundary: packages=com.acme.orders must NOT swallow
             // com.acme.ordersprocessing — match the package prefix OR the exact type name
             types = types.or(ElementMatchers.nameStartsWith(pkg + ".").or(ElementMatchers.named(pkg)));
+        }
+        for (String excl : config.excludes()) {
+            types = types.and(not(ElementMatchers.nameStartsWith(excl + ".").or(ElementMatchers.named(excl))));
         }
         AgentBuilder builder = new AgentBuilder.Default().disableClassFormatChanges();
         // Retransformation lets us instrument classes already loaded before the agent —
@@ -71,14 +82,49 @@ public final class StacktaleAgent {
                 .installOn(instrumentation);
     }
 
-    private static List<String> parsePackages(String agentArgs) {
-        List<String> packages = new ArrayList<>();
-        if (agentArgs == null) return packages;
-        for (String part : agentArgs.split("[,;]")) {
-            String trimmed = part.trim();
-            if (trimmed.startsWith("packages=")) trimmed = trimmed.substring("packages=".length());
-            if (!trimmed.isEmpty() && !trimmed.contains("=")) packages.add(trimmed);
+    /**
+     * Parsed {@code -javaagent} arguments. All keys are {@code key=value}, separated by
+     * {@code ,} or {@code ;}: {@code packages}, {@code excludes} (both prefix lists),
+     * {@code maxFrames}, {@code maxValueLength}, and {@code renderToString} (set false to
+     * record only the type and nullness of non-primitive args — for privacy-tight
+     * environments).
+     */
+    public record Config(List<String> packages, List<String> excludes,
+                         int maxFrames, int maxValueLength, boolean renderToString) {
+
+        static Config parse(String agentArgs) {
+            List<String> packages = new ArrayList<>();
+            List<String> excludes = new ArrayList<>();
+            int maxFrames = 5;
+            int maxValueLength = 60;
+            boolean renderToString = true;
+            if (agentArgs != null) {
+                for (String part : agentArgs.split("[,;]")) {
+                    String trimmed = part.trim();
+                    if (trimmed.isEmpty()) continue;
+                    int eq = trimmed.indexOf('=');
+                    String key = eq < 0 ? "packages" : trimmed.substring(0, eq).trim();
+                    String value = eq < 0 ? trimmed : trimmed.substring(eq + 1).trim();
+                    if (value.isEmpty()) continue;
+                    switch (key) {
+                        case "packages" -> packages.add(value);
+                        case "excludes" -> excludes.add(value);
+                        case "maxFrames" -> maxFrames = parseInt(value, maxFrames);
+                        case "maxValueLength" -> maxValueLength = parseInt(value, maxValueLength);
+                        case "renderToString" -> renderToString = Boolean.parseBoolean(value);
+                        default -> { /* unknown key ignored */ }
+                    }
+                }
+            }
+            return new Config(packages, excludes, maxFrames, maxValueLength, renderToString);
         }
-        return packages;
+
+        private static int parseInt(String s, int fallback) {
+            try {
+                return Integer.parseInt(s);
+            } catch (NumberFormatException e) {
+                return fallback;
+            }
+        }
     }
 }

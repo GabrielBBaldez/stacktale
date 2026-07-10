@@ -20,8 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class CaptureRegistry {
 
-    private static final int MAX_FRAMES_PER_THROWABLE = 5;
-    private static final int MAX_VALUE_LENGTH = 60;
+    private static volatile int maxFrames = 5;
+    private static volatile int maxValueLength = 60;
+    private static volatile boolean renderToString = true;
 
     private static final Map<Throwable, Deque<String>> CAPTURES =
             Collections.synchronizedMap(new WeakHashMap<>());
@@ -29,12 +30,19 @@ public final class CaptureRegistry {
 
     private CaptureRegistry() {}
 
+    /** Applied once at agent install from the {@code -javaagent} arguments. */
+    public static void configure(int frames, int valueLength, boolean toString) {
+        maxFrames = Math.max(1, frames);
+        maxValueLength = Math.max(8, valueLength);
+        renderToString = toString;
+    }
+
     /** Called from instrumented methods (via advice) when they exit with a throwable. */
     public static void record(Throwable thrown, String className, String methodName, Object[] args) {
         try {
             Deque<String> frames = CAPTURES.computeIfAbsent(thrown, k -> new ArrayDeque<>());
             synchronized (frames) {
-                if (frames.size() >= MAX_FRAMES_PER_THROWABLE) return;
+                if (frames.size() >= maxFrames) return;
                 frames.addLast(formatFrame(className, methodName, args));
             }
         } catch (Throwable ignored) {
@@ -69,11 +77,21 @@ public final class CaptureRegistry {
                 return value.getClass().getComponentType().getSimpleName()
                         + "[" + java.lang.reflect.Array.getLength(value) + "]";
             }
+            // privacy mode: for non-value types, record the type name only, never the
+            // toString() (which may hold PII). Primitives/wrappers/String/enum are shown.
+            if (!renderToString && !isValueType(value.getClass())) {
+                return value.getClass().getSimpleName();
+            }
             String s = String.valueOf(value);
-            return s.length() > MAX_VALUE_LENGTH ? s.substring(0, MAX_VALUE_LENGTH) + "…" : s;
+            return s.length() > maxValueLength ? s.substring(0, maxValueLength) + "…" : s;
         } catch (Throwable t) {
             return "<toString failed>";
         }
+    }
+
+    private static boolean isValueType(Class<?> type) {
+        return type.isPrimitive() || type.isEnum() || type == String.class
+                || Number.class.isAssignableFrom(type) || type == Boolean.class || type == Character.class;
     }
 
     /** Real parameter names when the class was compiled with -parameters; argN otherwise. */

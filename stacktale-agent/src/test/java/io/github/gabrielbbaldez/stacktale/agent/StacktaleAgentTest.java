@@ -42,6 +42,35 @@ class StacktaleAgentTest {
     }
 
     @Test
+    void parsesAllConfigKeys() {
+        StacktaleAgent.Config c = StacktaleAgent.Config.parse(
+                "packages=com.a;packages=com.b;excludes=com.a.dto;maxFrames=3;maxValueLength=20;renderToString=false");
+        assertThat(c.packages()).containsExactly("com.a", "com.b");
+        assertThat(c.excludes()).containsExactly("com.a.dto");
+        assertThat(c.maxFrames()).isEqualTo(3);
+        assertThat(c.maxValueLength()).isEqualTo(20);
+        assertThat(c.renderToString()).isFalse();
+        // bare value is treated as a package (back-compat with packages=)
+        assertThat(StacktaleAgent.Config.parse("com.only").packages()).containsExactly("com.only");
+    }
+
+    @Test
+    void privacyModeRecordsTypeNotValueForObjects() {
+        CaptureRegistry.configure(5, 60, false);
+        try {
+            OrderFlow.Customer secret = new OrderFlow.Customer("gabriel@private.com");
+            RuntimeException e = new RuntimeException("privacy");
+            CaptureRegistry.record(e, "com.acme.Svc", "charge", new Object[]{secret, 889});
+            assertThat(CaptureRegistry.get(e).get(0))
+                    .contains("Customer")                   // object: type shown
+                    .doesNotContain("gabriel@private.com")  // object: value hidden
+                    .contains("889");                       // primitive: still shown
+        } finally {
+            CaptureRegistry.configure(5, 60, true); // restore for the other tests
+        }
+    }
+
+    @Test
     void installIsResilientAndPackageMatchingRespectsBoundaries() {
         Instrumentation instrumentation = ByteBuddyAgent.install();
         // a sibling package sharing the literal prefix must NOT be swallowed

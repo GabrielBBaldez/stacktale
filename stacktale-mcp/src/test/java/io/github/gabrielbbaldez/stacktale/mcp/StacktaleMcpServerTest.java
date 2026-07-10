@@ -63,8 +63,54 @@ class StacktaleMcpServerTest {
                 "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
                 "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}");
         assertThat(r[0].at("/result/serverInfo/name").asText()).isEqualTo("stacktale");
+        assertThat(r[0].at("/result/capabilities/resources/subscribe").asBoolean()).isTrue();
         assertThat(r[1].at("/result/tools")).hasSize(3);
         assertThat(r[1].at("/result/tools/0/name").asText()).isEqualTo("list_errors");
+    }
+
+    @Test
+    void listsAndReadsTheReportsResource() throws Exception {
+        JsonNode[] r = roundTrip(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/list\",\"params\":{}}",
+                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/read\",\"params\":{\"uri\":\"stacktale://reports\"}}");
+        assertThat(r[0].at("/result/resources/0/uri").asText()).isEqualTo("stacktale://reports");
+        assertThat(r[1].at("/result/contents/0/text").asText()).contains("#bbbb2222");
+    }
+
+    @Test
+    void subscribePushesAnUpdateNotificationWhenTheFileChanges(@TempDir Path dir) throws Exception {
+        Path watched = dir.resolve("errors-ai.log");
+        Files.writeString(watched, ST_FILE, StandardCharsets.UTF_8);
+        StacktaleMcpServer server = new StacktaleMcpServer(watched);
+
+        java.io.PipedOutputStream toServer = new java.io.PipedOutputStream();
+        java.io.PipedInputStream serverIn = new java.io.PipedInputStream(toServer, 8192);
+        ByteArrayOutputStream serverOut = new ByteArrayOutputStream();
+
+        Thread serving = new Thread(() -> {
+            try { server.serve(serverIn, new java.io.FilterOutputStream(serverOut) {
+                @Override public void write(byte[] b, int off, int len) throws java.io.IOException {
+                    synchronized (serverOut) { super.out.write(b, off, len); }
+                }
+            }); } catch (Exception ignored) {}
+        });
+        serving.setDaemon(true);
+        serving.start();
+
+        toServer.write("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/subscribe\",\"params\":{}}\n"
+                .getBytes(StandardCharsets.UTF_8));
+        toServer.flush();
+        Thread.sleep(400); // let the watcher register
+
+        Files.writeString(watched, ST_FILE + "extra append\n", StandardCharsets.UTF_8);
+
+        String out = "";
+        for (int i = 0; i < 60 && !out.contains("notifications/resources/updated"); i++) {
+            Thread.sleep(100);
+            synchronized (serverOut) { out = serverOut.toString(StandardCharsets.UTF_8); }
+        }
+        toServer.close();
+        assertThat(out).contains("notifications/resources/updated").contains("stacktale://reports");
     }
 
     @Test

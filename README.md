@@ -285,7 +285,14 @@ Everything is optional — as appender properties in `logback.xml`, or `stacktal
 | `containerLogger` (repeatable) | Tomcat's | Extra logger prefixes treated as container echoes |
 | `emitReportsToLogger` | `false` | Also emit each block as ONE event via logger `stacktale.reports` |
 | `maxReportsPerMinute` | `0` (unlimited) | Cap full reports/min; a cascade of distinct errors becomes a `storm:` line instead of flooding the file |
+| `echoSuppressionMillis` | `2000` | Suppress container re-logs of a failure this thread just reported (0 = off) |
 | `requestLogging` *(starter)* | `true` | HTTP request lines into the story |
+
+The **agent** takes `-javaagent:stacktale-agent.jar=packages=com.your.app` plus optional
+`excludes=`, `maxFrames=`, `maxValueLength=`, and `renderToString=false` (privacy mode:
+record an object's type and nullness, never its `toString()`). The **MCP server**
+supports resource subscriptions — your AI assistant is notified the moment a new error
+lands, instead of polling.
 
 Async work: wrap hops with [`StacktaleExecutors`](stacktale/src/main/java/io/github/gabrielbbaldez/stacktale/StacktaleExecutors.java)
 (`wrap(executor)` / `wrap(runnable)`) so the MDC — and with it the story — survives
