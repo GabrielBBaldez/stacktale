@@ -21,6 +21,5 @@ jobs:
       - name: Coverage summary
         if: matrix.java == 21
         run: |
-          awk -F, 'NR>1 && FNR>1 {m+=$8; c+=$9} END {printf "**Line coverage: %.1f%%** (%d/%d lines)\n", c*100/(c+m), c, c+m}' \
-            stacktale/target/site/jacoco/jacoco.csv stacktale-spring-boot-starter/target/site/jacoco/jacoco.csv \
-            >> "$GITHUB_STEP_SUMMARY"
+          awk -F, 'FNR>1 {m+=$8; c+=$9} END {printf "**Line coverage: %.1f%%** (%d/%d lines)\n", c*100/(c+m), c, c+m}' \
+            $(find . -path '*/site/jacoco/jacoco.csv') >> "$GITHUB_STEP_SUMMARY"

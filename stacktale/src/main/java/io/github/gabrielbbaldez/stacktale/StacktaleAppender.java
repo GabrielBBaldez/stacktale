@@ -3,29 +3,27 @@ package io.github.gabrielbbaldez.stacktale;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
+import ch.qos.logback.classic.spi.ThrowableProxy;
 import ch.qos.logback.core.UnsynchronizedAppenderBase;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
- * The stacktale entry point: a Logback appender that watches the event stream, keeps a
- * short story of what each context has been doing, and — when an ERROR passes by — writes
- * a complete, AI-oriented error report to a separate file. The human log stays untouched;
- * a single pointer line (logger {@code stacktale}) links console and report.
+ * The Logback face of stacktale: a thin adapter that turns {@link ILoggingEvent}s into
+ * {@link LogEventData} and hands them to the framework-agnostic {@link ReportPipeline},
+ * which writes AI-oriented error reports to a separate file while the human log stays
+ * untouched.
  *
- * <p>Guarantee: this appender never throws out of {@link #append} and never blocks the
- * happy path with I/O. If something inside stacktale breaks, it degrades to a no-op.
+ * <p>Guarantee: never throws out of {@link #append} and never blocks the happy path with
+ * I/O. If something inside stacktale breaks, it degrades to a no-op.
  */
 public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
-
-    /** Logger used for announce/pointer lines; events from it are ignored by the pipeline. */
-    private static final String SELF_LOGGER = "stacktale";
 
     private String file = "errors-ai.log";
     private String appPackages = "";
@@ -43,15 +41,9 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
     private String correlationMdcKeys = "traceId,correlationId,requestId";
     private String zone = "";
 
-    private StoryBuffer storyBuffer;
-    private StackDistiller distiller;
-    private Deduper deduper;
-    private EnvCollector env;
-    private ReportRenderer renderer;
-    private ReportWriter writer;
+    private ReportPipeline pipeline;
     private org.slf4j.Logger selfLogger;
-    private final AtomicBoolean warnedOnce = new AtomicBoolean();
-    private final AtomicBoolean announced = new AtomicBoolean();
+    private volatile boolean mdcUnavailable;
 
     @Override
     public void start() {
@@ -62,100 +54,86 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
             addWarn("invalid zone '" + zone + "', falling back to system default", e);
             zoneId = ZoneId.systemDefault();
         }
-        storyBuffer = new StoryBuffer(storySize, storyWindowSeconds * 1000L, csv(correlationMdcKeys), 200);
-        distiller = new StackDistiller(csv(appPackages));
-        deduper = new Deduper(dedupWindowSeconds * 1000L, 60_000, System::currentTimeMillis);
-        env = new EnvCollector(Thread.currentThread().getContextClassLoader());
-        renderer = new ReportRenderer(zoneId, buildRedactor());
-        try {
-            String marker = renderer.sessionMarker(System.currentTimeMillis(), ProcessHandle.current().pid());
-            writer = new ReportWriter(Path.of(file), maxFileSizeMb * 1024L * 1024L, renderer.fileHeader(),
-                    marker, truncateOnStart, maxBackups);
-        } catch (RuntimeException e) {
-            // e.g. InvalidPathException from a value the OS rejects: a broken stacktale
-            // config must degrade to a no-op, never break application startup
-            addWarn("invalid <file> '" + file + "', stacktale disabled", e);
-            writer = null;
-        }
         // Log through this appender's own context: during application boot start() runs in
         // the middle of SLF4J initialization, and the global LoggerFactory is not safe yet
         // (and would be the wrong context in multi-context environments).
         selfLogger = getContext() instanceof ch.qos.logback.classic.LoggerContext lc
-                ? lc.getLogger(SELF_LOGGER)
-                : LoggerFactory.getLogger(SELF_LOGGER);
+                ? lc.getLogger(ReportPipeline.SELF_LOGGER)
+                : LoggerFactory.getLogger(ReportPipeline.SELF_LOGGER);
+
+        List<Pattern> compiled = new java.util.ArrayList<>();
+        for (String p : redactPatterns) {
+            try {
+                compiled.add(Pattern.compile(p));
+            } catch (RuntimeException e) {
+                addWarn("invalid redactPattern '" + p + "' ignored", e);
+            }
+        }
+
+        ReportPipeline.Settings settings = new ReportPipeline.Settings(
+                file, csv(appPackages), storySize, storyWindowSeconds * 1000L,
+                dedupWindowSeconds * 1000L, maxFileSizeMb * 1024L * 1024L, maxBackups, truncateOnStart,
+                reportErrorsWithoutThrowable, captureExceptionFields, redactionEnabled, compiled,
+                csv(correlationMdcKeys), zoneId);
+        pipeline = ReportPipeline.create(settings, new ReportPipeline.Host() {
+            @Override
+            public void selfLog(String message) {
+                selfLogger.info(message);
+            }
+
+            @Override
+            public void warn(String message, Throwable t) {
+                addWarn(message, t);
+            }
+        });
         super.start();
-        // Status message always works; the logger announcement is deferred to the first
-        // event because during Joran config no appender-ref is attached to any logger yet.
         addInfo("stacktale active → " + file + " (error reports for AI consumption)");
-        if (installUncaughtHandler) UncaughtHandler.install();
+        if (installUncaughtHandler) {
+            org.slf4j.Logger uncaught = LoggerFactory.getLogger(UncaughtHandler.UNCAUGHT_LOGGER);
+            UncaughtHandler.install(uncaught::error);
+        }
     }
 
     @Override
     protected void append(ILoggingEvent event) {
         try {
-            if (writer == null || SELF_LOGGER.equals(event.getLoggerName())) return;
-            if (announced.compareAndSet(false, true)) {
-                // deferred from start(): by now appender-refs are wired, so this reaches the console
-                selfLogger.info("stacktale active → {} (error reports for AI consumption)", file);
-            }
-            storyBuffer.record(event);
-            if (!event.getLevel().isGreaterOrEqual(Level.ERROR)) return;
-
-            IThrowableProxy proxy = event.getThrowableProxy();
-            if (proxy == null && !reportErrorsWithoutThrowable) return;
-
-            DistilledStack stack = proxy == null ? null : distiller.distill(proxy);
-            String fingerprint = stack != null
-                    ? Fingerprinter.fingerprint(stack.rootType(), stack.culpritLine(), stack.rootMessage())
-                    : Fingerprinter.fingerprint(event.getLoggerName(), "", event.getMessage());
-
-            Decision decision = deduper.decide(fingerprint);
-            switch (decision.kind()) {
-                case REPORT -> {
-                    try {
-                        Report report = new Report(fingerprint, event.getTimeStamp(), event.getThreadName(),
-                                stack, event.getMessage(), event.getArgumentArray(), event.getLoggerName(),
-                                storyBuffer.safeMdc(event), exceptionFields(proxy),
-                                storyBuffer.storyFor(event), env.envLine());
-                        writer.append(renderer.render(report));
-                    } catch (Throwable t) {
-                        // don't leave the dedup window believing a report exists that was
-                        // never written — the next occurrence must get a fresh chance
-                        deduper.rollback(fingerprint);
-                        throw t;
-                    }
-                    selfLogger.info("AI error report #{} → {}", fingerprint, file);
-                }
-                case SUMMARY -> writer.append(
-                        renderer.renderSummary(fingerprint, decision.count(), decision.lastSeenMillis()));
-                case SILENT -> { /* counted; nothing to write */ }
-            }
+            pipeline.process(adapt(event));
         } catch (Throwable t) {
-            if (warnedOnce.compareAndSet(false, true)) {
-                addWarn("stacktale failed to process an event; further failures are silent", t);
-            }
+            // pipeline.process never throws; this guards the adaptation itself
         }
     }
 
-    private Redactor buildRedactor() {
-        if (!redactionEnabled) return Redactor.disabled();
-        List<java.util.regex.Pattern> compiled = new java.util.ArrayList<>();
-        for (String p : redactPatterns) {
-            try {
-                compiled.add(java.util.regex.Pattern.compile(p));
-            } catch (RuntimeException e) {
-                addWarn("invalid redactPattern '" + p + "' ignored", e);
-            }
-        }
-        return Redactor.withDefaults(compiled);
+    private LogEventData adapt(ILoggingEvent event) {
+        IThrowableProxy proxy = event.getThrowableProxy();
+        Throwable throwable = proxy instanceof ThrowableProxy tp ? tp.getThrowable() : null;
+        return new LogEventData(
+                event.getTimeStamp(),
+                event.getLevel().toString(),
+                event.getLevel().isGreaterOrEqual(Level.ERROR),
+                event.getLoggerName(),
+                event.getThreadName(),
+                event.getMessage(),
+                event.getArgumentArray(),
+                event.getFormattedMessage(),
+                safeMdc(event),
+                throwable);
     }
 
-    /** State off the exception chain's own getters/fields — see {@link FieldExtractor}. */
-    private java.util.Map<String, String> exceptionFields(IThrowableProxy proxy) {
-        if (!captureExceptionFields || !(proxy instanceof ch.qos.logback.classic.spi.ThrowableProxy tp)) {
-            return java.util.Map.of();
+    /**
+     * {@link ILoggingEvent#getMDCPropertyMap()} can throw on hand-built logger contexts
+     * (no MDCAdapter installed). MDC is optional enrichment — never let it break the
+     * pipeline, and cache the failure: filling one NPE stack trace per event costs
+     * microseconds and would silently dominate the happy path (found by AppendBenchmark).
+     */
+    private Map<String, String> safeMdc(ILoggingEvent event) {
+        if (mdcUnavailable) return Map.of();
+        try {
+            Map<String, String> mdc = event.getMDCPropertyMap();
+            return mdc == null ? Map.of() : mdc;
+        } catch (Throwable t) {
+            mdcUnavailable = true;
+            return Map.of();
         }
-        return FieldExtractor.extractChain(tp.getThrowable());
     }
 
     private static List<String> csv(String s) {

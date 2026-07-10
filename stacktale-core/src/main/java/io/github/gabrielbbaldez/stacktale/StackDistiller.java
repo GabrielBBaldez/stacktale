@@ -1,12 +1,12 @@
 package io.github.gabrielbbaldez.stacktale;
 
-import ch.qos.logback.classic.spi.IThrowableProxy;
-import ch.qos.logback.classic.spi.StackTraceElementProxy;
-
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Turns a throwable chain into a {@link DistilledStack}: the deepest cause becomes the
@@ -41,6 +41,7 @@ final class StackDistiller {
         FRAMEWORK_GROUPS.put("org.junit.", "test");
         FRAMEWORK_GROUPS.put("org.mockito.", "test");
         FRAMEWORK_GROUPS.put("ch.qos.logback.", "logging");
+        FRAMEWORK_GROUPS.put("org.apache.logging.log4j.", "logging");
         FRAMEWORK_GROUPS.put("org.slf4j.", "logging");
     }
 
@@ -50,18 +51,18 @@ final class StackDistiller {
         this.appPackages = appPackages;
     }
 
-    DistilledStack distill(IThrowableProxy proxy) {
-        List<IThrowableProxy> chain = causeChain(proxy);
-        IThrowableProxy root = chain.get(chain.size() - 1);
+    DistilledStack distill(Throwable throwable) {
+        List<Throwable> chain = causeChain(throwable);
+        Throwable root = chain.get(chain.size() - 1);
 
-        StackTraceElementProxy[] frames = root.getStackTraceElementProxyArray();
-        if (frames == null) frames = new StackTraceElementProxy[0];
+        StackTraceElement[] frames = root.getStackTrace();
+        if (frames == null) frames = new StackTraceElement[0];
 
         String culprit = null;
         boolean culpritIsApp = false;
         int culpritIdx = -1;
         for (int i = 0; i < frames.length; i++) {
-            if (isAppFrame(frames[i].getStackTraceElement())) {
+            if (isAppFrame(frames[i])) {
                 culprit = location(frames[i]);
                 culpritIdx = i;
                 culpritIsApp = true;
@@ -78,32 +79,32 @@ final class StackDistiller {
 
         List<String> wrappedBy = new ArrayList<>();
         for (int i = chain.size() - 2; i >= 0; i--) {
-            IThrowableProxy w = chain.get(i);
-            wrappedBy.add(simpleName(w.getClassName()) + "(\"" + truncate(nullToEmpty(w.getMessage()), MAX_WRAPPER_MSG)
+            Throwable w = chain.get(i);
+            wrappedBy.add(simpleName(w.getClass().getName()) + "(\"" + truncate(nullToEmpty(w.getMessage()), MAX_WRAPPER_MSG)
                     + "\") at " + firstLocation(w));
         }
 
         List<String> suppressed = new ArrayList<>();
-        IThrowableProxy[] sup = root.getSuppressed();
+        Throwable[] sup = root.getSuppressed();
         if (sup != null) {
             for (int i = 0; i < sup.length && i < MAX_SUPPRESSED; i++) {
-                suppressed.add("suppressed: " + simpleName(sup[i].getClassName()) + "(\""
+                suppressed.add("suppressed: " + simpleName(sup[i].getClass().getName()) + "(\""
                         + truncate(nullToEmpty(sup[i].getMessage()), MAX_WRAPPER_MSG) + "\") at " + firstLocation(sup[i]));
             }
             if (sup.length > MAX_SUPPRESSED) suppressed.add("… " + (sup.length - MAX_SUPPRESSED) + " more suppressed");
         }
 
         int shown = (int) frameLines.stream().filter(l -> !l.startsWith("…")).count();
-        return new DistilledStack(simpleName(root.getClassName()), root.getMessage(), culprit, culpritIsApp,
+        return new DistilledStack(simpleName(root.getClass().getName()), root.getMessage(), culprit, culpritIsApp,
                 wrappedBy, frameLines, frames.length, shown, suppressed);
     }
 
-    private List<String> renderFrames(StackTraceElementProxy[] frames, int culpritIdx) {
+    private List<String> renderFrames(StackTraceElement[] frames, int culpritIdx) {
         List<String> out = new ArrayList<>();
         int shown = 0;
         int i = 0;
         while (i < frames.length) {
-            StackTraceElement el = frames[i].getStackTraceElement();
+            StackTraceElement el = frames[i];
             boolean mustShow = i == 0 || i == culpritIdx || isAppFrame(el);
             if (mustShow) {
                 if (shown >= MAX_SHOWN_FRAMES) {
@@ -116,8 +117,8 @@ final class StackDistiller {
             } else {
                 int start = i;
                 Map<String, Integer> groups = new LinkedHashMap<>();
-                while (i < frames.length && i != culpritIdx && !isAppFrame(frames[i].getStackTraceElement())) {
-                    groups.merge(groupOf(frames[i].getStackTraceElement().getClassName()), 1, Integer::sum);
+                while (i < frames.length && i != culpritIdx && !isAppFrame(frames[i])) {
+                    groups.merge(groupOf(frames[i].getClassName()), 1, Integer::sum);
                     i++;
                 }
                 int run = i - start;
@@ -143,10 +144,11 @@ final class StackDistiller {
         return out;
     }
 
-    private List<IThrowableProxy> causeChain(IThrowableProxy proxy) {
-        List<IThrowableProxy> chain = new ArrayList<>();
-        IThrowableProxy cur = proxy;
-        while (cur != null && chain.size() < MAX_CAUSE_DEPTH && !chain.contains(cur)) {
+    private List<Throwable> causeChain(Throwable throwable) {
+        List<Throwable> chain = new ArrayList<>();
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable cur = throwable;
+        while (cur != null && chain.size() < MAX_CAUSE_DEPTH && seen.add(cur)) {
             chain.add(cur);
             cur = cur.getCause();
         }
@@ -168,13 +170,12 @@ final class StackDistiller {
         return "other";
     }
 
-    private String firstLocation(IThrowableProxy p) {
-        StackTraceElementProxy[] f = p.getStackTraceElementProxyArray();
+    private String firstLocation(Throwable t) {
+        StackTraceElement[] f = t.getStackTrace();
         return (f == null || f.length == 0) ? "(no stack)" : location(f[0]);
     }
 
-    private static String location(StackTraceElementProxy p) {
-        StackTraceElement el = p.getStackTraceElement();
+    private static String location(StackTraceElement el) {
         String cls = simpleName(el.getClassName());
         String file = el.getFileName() == null ? "Unknown" : el.getFileName();
         return cls + "." + el.getMethodName() + "(" + file + ":" + el.getLineNumber() + ")";

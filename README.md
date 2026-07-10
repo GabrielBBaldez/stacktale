@@ -122,6 +122,30 @@ via `stacktale.*` properties in `application.yml`.
 Reports land in `./errors-ai.log`. Point your AI assistant at that file — it announces
 itself on startup, and the file header explains the format to any AI that opens it.
 
+### Log4j2
+
+```xml
+<dependency>
+  <groupId>io.github.gabrielbbaldez</groupId>
+  <artifactId>stacktale-log4j2</artifactId>
+  <version>0.2.0</version>
+</dependency>
+```
+
+```xml
+<Configuration packages="io.github.gabrielbbaldez.stacktale.log4j2">
+  <Appenders>
+    <Stacktale name="STACKTALE" appPackages="com.your.app"/>
+  </Appenders>
+  <Loggers>
+    <Root level="info"><AppenderRef ref="STACKTALE"/></Root>
+  </Loggers>
+</Configuration>
+```
+
+Same pipeline, same st/1 format, story correlation via `ThreadContext` — both backends
+share `stacktale-core`.
+
 ## What gets captured
 
 | Section | What it is |
@@ -217,16 +241,15 @@ Async work: wrap hops with [`StacktaleExecutors`](stacktale/src/main/java/io/git
 - stacktale organizes what your app already logs. If the app logs nothing before the
   error, there is no story to tell.
 - Redaction is regex-level hygiene, not semantic PII detection.
-- Logback only for now (which includes Spring Boot by default). Log4j2 is
-  [#7](https://github.com/GabrielBBaldez/stacktale/issues/7).
+- `StacktaleExecutors` propagates the SLF4J MDC; in Log4j2-native apps (no SLF4J
+  binding), propagate `ThreadContext` across hops yourself.
 
 ## Roadmap
 
-Maven Central publication ([#2](https://github.com/GabrielBBaldez/stacktale/issues/2)),
-Log4j2 ([#7](https://github.com/GabrielBBaldez/stacktale/issues/7)), real-world format
-validation ([#4](https://github.com/GabrielBBaldez/stacktale/issues/4)) — full list in
-[issues](https://github.com/GabrielBBaldez/stacktale/issues). Contributions welcome:
-see [CONTRIBUTING.md](CONTRIBUTING.md).
+Maven Central publication ([#2](https://github.com/GabrielBBaldez/stacktale/issues/2))
+and real-world format validation ([#4](https://github.com/GabrielBBaldez/stacktale/issues/4))
+— full list in [issues](https://github.com/GabrielBBaldez/stacktale/issues).
+Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

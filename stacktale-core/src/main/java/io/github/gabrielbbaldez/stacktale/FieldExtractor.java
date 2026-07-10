@@ -56,14 +56,19 @@ final class FieldExtractor {
                     if (out.size() >= MAX_FIELDS) return out;
                     String name = getterName(m);
                     if (name == null || out.containsKey(name)) continue;
+                    // public getters on package-private classes still need setAccessible
+                    // when we call from another package; trySetAccessible degrades quietly
+                    // under closed JPMS modules instead of throwing
                     readInto(out, name, () -> m.invoke(t), m.getReturnType(), Modifier.isPublic(m.getModifiers())
-                            && !Modifier.isStatic(m.getModifiers()) && m.getParameterCount() == 0);
+                            && !Modifier.isStatic(m.getModifiers()) && m.getParameterCount() == 0
+                            && (m.canAccess(t) || m.trySetAccessible()));
                 }
                 for (Field f : cls.getDeclaredFields()) {
                     if (out.size() >= MAX_FIELDS) return out;
                     if (out.containsKey(f.getName())) continue;
                     readInto(out, f.getName(), () -> f.get(t), f.getType(), Modifier.isPublic(f.getModifiers())
-                            && !Modifier.isStatic(f.getModifiers()));
+                            && !Modifier.isStatic(f.getModifiers())
+                            && (f.canAccess(t) || f.trySetAccessible()));
                 }
             }
         } catch (Throwable ignored) {

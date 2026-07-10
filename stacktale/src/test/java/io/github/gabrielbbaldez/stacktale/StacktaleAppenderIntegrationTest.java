@@ -197,7 +197,8 @@ class StacktaleAppenderIntegrationTest {
     void uncaughtExceptionsFlowThroughPipeline(@TempDir Path dir) throws Exception {
         Path file = dir.resolve("errors-ai.log");
         startAppender(file, "");
-        UncaughtHandler handler = new UncaughtHandler(null, ctx.getLogger("stacktale.uncaught"));
+        org.slf4j.Logger uncaughtLogger = ctx.getLogger(UncaughtHandler.UNCAUGHT_LOGGER);
+        UncaughtHandler handler = new UncaughtHandler(null, uncaughtLogger::error);
         Thread t = new Thread(() -> {
             throw new IllegalArgumentException("thread died");
         }, "worker-1");

@@ -1,7 +1,5 @@
 package io.github.gabrielbbaldez.stacktale;
 
-import ch.qos.logback.classic.spi.ILoggingEvent;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -40,7 +38,7 @@ final class StoryBuffer {
         this.maxMessageLength = maxMessageLength;
     }
 
-    void record(ILoggingEvent event) {
+    void record(LogEventData event) {
         StoryEntry entry = toEntry(event);
         String key = correlationKey(event);
         if (key != null) {
@@ -52,8 +50,8 @@ final class StoryBuffer {
         }
     }
 
-    Story storyFor(ILoggingEvent errorEvent) {
-        long cutoff = errorEvent.getTimeStamp() - windowMillis;
+    Story storyFor(LogEventData errorEvent) {
+        long cutoff = errorEvent.epochMillis() - windowMillis;
         String key = correlationKey(errorEvent);
         List<StoryEntry> snapshot;
         String label;
@@ -68,7 +66,7 @@ final class StoryBuffer {
             synchronized (deque) {
                 snapshot = new ArrayList<>(deque);
             }
-            label = "thread " + errorEvent.getThreadName();
+            label = "thread " + errorEvent.threadName();
         }
         return new Story(snapshot.stream().filter(e -> e.epochMillis() >= cutoff).toList(), label);
     }
@@ -80,42 +78,22 @@ final class StoryBuffer {
         }
     }
 
-    private StoryEntry toEntry(ILoggingEvent event) {
-        String logger = event.getLoggerName();
+    private StoryEntry toEntry(LogEventData event) {
+        String logger = event.loggerName();
         int dot = logger.lastIndexOf('.');
         if (dot >= 0) logger = logger.substring(dot + 1);
-        String msg = String.valueOf(event.getFormattedMessage());
+        String msg = String.valueOf(event.formattedMessage());
         if (msg.length() > maxMessageLength) msg = msg.substring(0, maxMessageLength) + "…";
-        return new StoryEntry(event.getTimeStamp(), event.getLevel().toString(), logger, msg);
+        return new StoryEntry(event.epochMillis(), event.level(), logger, msg);
     }
 
-    private String correlationKey(ILoggingEvent event) {
-        Map<String, String> mdc = safeMdc(event);
-        if (mdc.isEmpty()) return null;
+    private String correlationKey(LogEventData event) {
+        Map<String, String> mdc = event.mdc();
+        if (mdc == null || mdc.isEmpty()) return null;
         for (String k : correlationKeys) {
             String v = mdc.get(k);
             if (v != null && !v.isBlank()) return k + "=" + v;
         }
         return null;
-    }
-
-    private volatile boolean mdcUnavailable;
-
-    /**
-     * {@link ILoggingEvent#getMDCPropertyMap()} can throw on hand-built logger contexts
-     * (no MDCAdapter installed, e.g. logback 1.5.x standalone contexts). MDC is optional
-     * enrichment — never let it break the pipeline. The failure is cached: filling one
-     * NPE stack trace per event costs microseconds and would silently dominate the
-     * happy path (found by AppendBenchmark).
-     */
-    Map<String, String> safeMdc(ILoggingEvent event) {
-        if (mdcUnavailable) return Map.of();
-        try {
-            Map<String, String> mdc = event.getMDCPropertyMap();
-            return mdc == null ? Map.of() : mdc;
-        } catch (Throwable t) {
-            mdcUnavailable = true;
-            return Map.of();
-        }
     }
 }

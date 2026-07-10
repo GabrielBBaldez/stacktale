@@ -1,6 +1,5 @@
 package io.github.gabrielbbaldez.stacktale;
 
-import ch.qos.logback.classic.spi.ThrowableProxy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,7 +26,7 @@ class StackDistillerTest {
         IllegalStateException wrapper = withStack(new IllegalStateException("confirm failed", npe),
                 el("com.acme.OrderService", "confirm", "OrderService.java", 92));
 
-        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(new ThrowableProxy(wrapper));
+        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(wrapper);
 
         assertThat(d.rootType()).isEqualTo("NullPointerException");
         assertThat(d.rootMessage()).isEqualTo("customer is null");
@@ -47,7 +46,7 @@ class StackDistillerTest {
         frames[7] = el("com.acme.Main", "main", "Main.java", 5);
         RuntimeException e = withStack(new RuntimeException("x"), frames);
 
-        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(new ThrowableProxy(e));
+        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(e);
 
         assertThat(d.frameLines()).anySatisfy(l ->
                 assertThat(l).contains("… 6 collapsed").contains("spring ×4").contains("tomcat ×2"));
@@ -60,7 +59,7 @@ class StackDistillerTest {
         RuntimeException e = withStack(new RuntimeException("deep"),
                 el("java.util.HashMap", "hash", "HashMap.java", 338),
                 el("com.acme.Svc", "run", "Svc.java", 10));
-        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(new ThrowableProxy(e));
+        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(e);
         assertThat(d.frameLines().get(0)).contains("HashMap.hash(HashMap.java:338)");
         assertThat(d.culpritLine()).isEqualTo("Svc.run(Svc.java:10)");
         assertThat(d.culpritIsAppCode()).isTrue();
@@ -72,7 +71,7 @@ class StackDistillerTest {
         RuntimeException e = withStack(new RuntimeException("binding failed"),
                 el("org.springframework.web.method.support.HandlerMethodArgumentResolver", "resolve", "H.java", 186),
                 el("org.apache.catalina.core.ApplicationFilterChain", "doFilter", "A.java", 166));
-        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(new ThrowableProxy(e));
+        DistilledStack d = new StackDistiller(List.of("com.acme")).distill(e);
         assertThat(d.culpritLine()).isEqualTo("HandlerMethodArgumentResolver.resolve(H.java:186)");
         assertThat(d.culpritIsAppCode()).isFalse();
     }
@@ -82,7 +81,7 @@ class StackDistillerTest {
         RuntimeException e = withStack(new RuntimeException("x"),
                 el("org.springframework.core.C", "m", "C.java", 1),
                 el("com.whatever.Foo", "bar", "Foo.java", 2));
-        DistilledStack d = new StackDistiller(List.of()).distill(new ThrowableProxy(e));
+        DistilledStack d = new StackDistiller(List.of()).distill(e);
         assertThat(d.culpritLine()).isEqualTo("Foo.bar(Foo.java:2)");
     }
 
@@ -93,7 +92,7 @@ class StackDistillerTest {
         for (int i = 1; i <= 15; i++) {
             cur = new RuntimeException("lvl" + i, cur);
         }
-        DistilledStack d = new StackDistiller(List.of()).distill(new ThrowableProxy(cur));
+        DistilledStack d = new StackDistiller(List.of()).distill(cur);
         assertThat(d.rootType()).isEqualTo("RuntimeException");
         assertThat(d.wrappedBy()).hasSizeLessThanOrEqualTo(9); // depth capped at 10 total
     }
@@ -102,7 +101,7 @@ class StackDistillerTest {
     void rendersSuppressedExceptions() {
         RuntimeException withSup = withStack(new RuntimeException("s"), el("com.acme.A", "m", "A.java", 1));
         withSup.addSuppressed(new IllegalArgumentException("cleanup failed"));
-        DistilledStack d = new StackDistiller(List.of()).distill(new ThrowableProxy(withSup));
+        DistilledStack d = new StackDistiller(List.of()).distill(withSup);
         assertThat(d.suppressed()).hasSize(1);
         assertThat(d.suppressed().get(0)).contains("IllegalArgumentException").contains("cleanup failed");
     }

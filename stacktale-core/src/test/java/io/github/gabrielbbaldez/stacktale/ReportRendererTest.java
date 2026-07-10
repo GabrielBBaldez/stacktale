@@ -1,6 +1,6 @@
 package io.github.gabrielbbaldez.stacktale;
 
-import ch.qos.logback.classic.spi.ThrowableProxy;
+
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -28,7 +28,7 @@ class ReportRendererTest {
                 new StackTraceElement("org.springframework.web.method.support.InvocableHandlerMethod", "invokeForRequest", "InvocableHandlerMethod.java", 190),
                 new StackTraceElement("org.apache.catalina.core.ApplicationFilterChain", "doFilter", "ApplicationFilterChain.java", 166),
         });
-        DistilledStack stack = new StackDistiller(List.of("com.acme")).distill(new ThrowableProxy(npe));
+        DistilledStack stack = new StackDistiller(List.of("com.acme")).distill(npe);
         Story story = new Story(List.of(
                 new StoryEntry(1_000_000L, "INFO", "OrderController", "POST /orders/123/confirm"),
                 new StoryEntry(1_000_108L, "INFO", "CustomerClient", "fetching customer 555 → 404"),
