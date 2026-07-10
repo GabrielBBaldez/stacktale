@@ -1,0 +1,20 @@
+name: Debug Central Deployment
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: Central deployment id to inspect
+        required: true
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query deployment status
+        run: |
+          TOKEN=$(printf '%s:%s' "$U" "$P" | base64 -w0)
+          curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+            "https://central.sonatype.com/api/v1/publisher/status?id=${{ inputs.deployment_id }}" | python3 -m json.tool
+        env:
+          U: ${{ secrets.CENTRAL_USERNAME }}
+          P: ${{ secrets.CENTRAL_PASSWORD }}
