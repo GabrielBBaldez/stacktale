@@ -160,12 +160,26 @@ public final class StacktaleAppender extends AbstractAppender {
             List<String> containers = containerLoggers == null || containerLoggers.isBlank()
                     ? ReportPipeline.Settings.DEFAULT_CONTAINER_LOGGERS
                     : csv(containerLoggers);
-            ReportPipeline.Settings settings = new ReportPipeline.Settings(
-                    file, csv(appPackages), storySize, storyWindowSeconds * 1000L,
-                    dedupWindowSeconds * 1000L, maxFileSizeMb * 1024L * 1024L, maxBackups, truncateOnStart,
-                    reportErrorsWithoutThrowable, captureExceptionFields, redactionEnabled, compiled,
-                    csv(correlationMdcKeys), zoneId, echoSuppressionMillis, containers,
-                    emitReportsToLogger, maxReportsPerMinute);
+            ReportPipeline.Settings settings = ReportPipeline.Settings.builder()
+                    .file(file)
+                    .appPackages(csv(appPackages))
+                    .storySize(storySize)
+                    .storyWindowMillis(storyWindowSeconds * 1000L)
+                    .dedupWindowMillis(dedupWindowSeconds * 1000L)
+                    .maxFileBytes(maxFileSizeMb * 1024L * 1024L)
+                    .maxBackups(maxBackups)
+                    .truncateOnStart(truncateOnStart)
+                    .reportErrorsWithoutThrowable(reportErrorsWithoutThrowable)
+                    .captureExceptionFields(captureExceptionFields)
+                    .redactionEnabled(redactionEnabled)
+                    .redactPatterns(compiled)
+                    .correlationMdcKeys(csv(correlationMdcKeys))
+                    .zone(zoneId)
+                    .echoSuppressionMillis(echoSuppressionMillis)
+                    .containerLoggers(containers)
+                    .emitReportsToLogger(emitReportsToLogger)
+                    .maxReportsPerMinute(maxReportsPerMinute)
+                    .build();
             ReportPipeline pipeline = ReportPipeline.create(settings, new ReportPipeline.Host() {
                 @Override
                 public void selfLog(String message) {

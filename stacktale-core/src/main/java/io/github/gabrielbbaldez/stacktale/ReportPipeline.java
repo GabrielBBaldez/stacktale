@@ -49,6 +49,63 @@ public final class ReportPipeline {
         /** Default logger prefixes whose errors are re-logs of an exception the app already reported. */
         public static final List<String> DEFAULT_CONTAINER_LOGGERS =
                 List.of("org.apache.catalina.core.ContainerBase");
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        /**
+         * Fluent builder for {@link Settings}: the framework appenders assemble config
+         * through named methods, so adding a knob never risks a positional-argument
+         * mistake and every default lives in exactly one place. All times are millis,
+         * sizes are bytes (framework-neutral).
+         */
+        public static final class Builder {
+            private String file = "errors-ai.log";
+            private List<String> appPackages = List.of();
+            private int storySize = 15;
+            private long storyWindowMillis = 60_000;
+            private long dedupWindowMillis = 300_000;
+            private long maxFileBytes = 5L * 1024 * 1024;
+            private int maxBackups = 1;
+            private boolean truncateOnStart = false;
+            private boolean reportErrorsWithoutThrowable = true;
+            private boolean captureExceptionFields = true;
+            private boolean redactionEnabled = true;
+            private List<Pattern> redactPatterns = List.of();
+            private List<String> correlationMdcKeys = List.of("traceId", "correlationId", "requestId");
+            private ZoneId zone = ZoneId.systemDefault();
+            private long echoSuppressionMillis = 2000;
+            private List<String> containerLoggers = DEFAULT_CONTAINER_LOGGERS;
+            private boolean emitReportsToLogger = false;
+            private int maxReportsPerMinute = 0;
+
+            public Builder file(String v) { this.file = v; return this; }
+            public Builder appPackages(List<String> v) { this.appPackages = v; return this; }
+            public Builder storySize(int v) { this.storySize = v; return this; }
+            public Builder storyWindowMillis(long v) { this.storyWindowMillis = v; return this; }
+            public Builder dedupWindowMillis(long v) { this.dedupWindowMillis = v; return this; }
+            public Builder maxFileBytes(long v) { this.maxFileBytes = v; return this; }
+            public Builder maxBackups(int v) { this.maxBackups = v; return this; }
+            public Builder truncateOnStart(boolean v) { this.truncateOnStart = v; return this; }
+            public Builder reportErrorsWithoutThrowable(boolean v) { this.reportErrorsWithoutThrowable = v; return this; }
+            public Builder captureExceptionFields(boolean v) { this.captureExceptionFields = v; return this; }
+            public Builder redactionEnabled(boolean v) { this.redactionEnabled = v; return this; }
+            public Builder redactPatterns(List<Pattern> v) { this.redactPatterns = v; return this; }
+            public Builder correlationMdcKeys(List<String> v) { this.correlationMdcKeys = v; return this; }
+            public Builder zone(ZoneId v) { this.zone = v; return this; }
+            public Builder echoSuppressionMillis(long v) { this.echoSuppressionMillis = v; return this; }
+            public Builder containerLoggers(List<String> v) { this.containerLoggers = v; return this; }
+            public Builder emitReportsToLogger(boolean v) { this.emitReportsToLogger = v; return this; }
+            public Builder maxReportsPerMinute(int v) { this.maxReportsPerMinute = v; return this; }
+
+            public Settings build() {
+                return new Settings(file, appPackages, storySize, storyWindowMillis, dedupWindowMillis,
+                        maxFileBytes, maxBackups, truncateOnStart, reportErrorsWithoutThrowable,
+                        captureExceptionFields, redactionEnabled, redactPatterns, correlationMdcKeys, zone,
+                        echoSuppressionMillis, containerLoggers, emitReportsToLogger, maxReportsPerMinute);
+            }
+        }
     }
 
     /** Callbacks into the hosting logging framework. */

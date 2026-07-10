@@ -75,12 +75,26 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
             }
         }
 
-        ReportPipeline.Settings settings = new ReportPipeline.Settings(
-                file, csv(appPackages), storySize, storyWindowSeconds * 1000L,
-                dedupWindowSeconds * 1000L, maxFileSizeMb * 1024L * 1024L, maxBackups, truncateOnStart,
-                reportErrorsWithoutThrowable, captureExceptionFields, redactionEnabled, compiled,
-                csv(correlationMdcKeys), zoneId, echoSuppressionMillis, List.copyOf(containerLoggers),
-                emitReportsToLogger, maxReportsPerMinute);
+        ReportPipeline.Settings settings = ReportPipeline.Settings.builder()
+                .file(file)
+                .appPackages(csv(appPackages))
+                .storySize(storySize)
+                .storyWindowMillis(storyWindowSeconds * 1000L)
+                .dedupWindowMillis(dedupWindowSeconds * 1000L)
+                .maxFileBytes(maxFileSizeMb * 1024L * 1024L)
+                .maxBackups(maxBackups)
+                .truncateOnStart(truncateOnStart)
+                .reportErrorsWithoutThrowable(reportErrorsWithoutThrowable)
+                .captureExceptionFields(captureExceptionFields)
+                .redactionEnabled(redactionEnabled)
+                .redactPatterns(compiled)
+                .correlationMdcKeys(csv(correlationMdcKeys))
+                .zone(zoneId)
+                .echoSuppressionMillis(echoSuppressionMillis)
+                .containerLoggers(List.copyOf(containerLoggers))
+                .emitReportsToLogger(emitReportsToLogger)
+                .maxReportsPerMinute(maxReportsPerMinute)
+                .build();
         org.slf4j.Logger reportsLogger = getContext() instanceof ch.qos.logback.classic.LoggerContext lc
                 ? lc.getLogger(ReportPipeline.REPORTS_LOGGER)
                 : LoggerFactory.getLogger(ReportPipeline.REPORTS_LOGGER);
