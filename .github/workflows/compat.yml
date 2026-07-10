@@ -15,14 +15,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "Logback 1.4 (floor)"
-            args: "-Dlogback.version=1.4.14"
+          # the plain-Logback floor excludes the Spring starter: Boot 3.4+ mandates
+          # Logback 1.5, so "starter + Logback 1.4" is not a real combination
+          - name: "Logback 1.4 (core, floor)"
+            args: "-pl stacktale-core,stacktale,stacktale-log4j2 -am -Dlogback.version=1.4.14"
           - name: "Logback 1.5 (current)"
             args: "-Dlogback.version=1.5.38"
           - name: "Log4j2 2.20 (floor)"
             args: "-Dlog4j2.version=2.20.0"
           - name: "Spring Boot 3.2"
-            args: "-Dspring-boot.version=3.2.12 -Dlogback.version=1.4.14"
+            args: "-Dspring-boot.version=3.2.12"
           - name: "Spring Boot 3.3"
             args: "-Dspring-boot.version=3.3.13"
           - name: "Spring Boot 3.5"

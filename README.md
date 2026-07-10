@@ -334,6 +334,9 @@ each backed by a passing build:
 | Log4j2 | 2.20+ | 2.24.x |
 | Spring Boot *(starter)* | 3.2+ | 3.5.x |
 
+The Spring Boot starter follows Boot's own Logback version (1.5 on Boot 3.4+); the
+`stacktale` and `stacktale-log4j2` artifacts work down to Logback 1.4 on their own.
+
 ## Roadmap
 
 The original roadmap (Central, Log4j2, starter, agent, MCP, real-world validation) has
