@@ -5,18 +5,29 @@ All notable changes to stacktale are documented here. The format follows
 [SemVer](https://semver.org/). The report format (`st/1`) is versioned independently
 and pinned by golden-file tests.
 
-## [Unreleased]
+## [0.2.0] — 2026-07-10
+
+First release on **Maven Central**.
 
 - **Log4j2 support**: new `stacktale-log4j2` module — same pipeline, same st/1 format,
   story correlation via `ThreadContext`, XML plugin appender (`<Stacktale …/>`).
 - **`stacktale-core`**: the report pipeline is now framework-agnostic; the Logback
   artifact keeps its coordinates and behavior as a thin adapter.
+- **Redaction hardening** (cross-audit findings): name-based redaction now reaches
+  `fields:`, `mdc:` and `args=` (secret arg positions derived from the message pattern);
+  short Basic credentials and JSON-quoted keys (`"password":"…"`) are masked; secret
+  keywords now include non-English names (senha, contraseña, passwort, chave…).
+- Spring starter: the auto-configured appender is replaced (never reused stale) across
+  application contexts in the same JVM, and detaches on context close.
+- `stacktale active` is no longer announced when the pipeline degraded to no-op.
 - FieldExtractor reads public getters on package-private exception classes
   (`trySetAccessible`, degrading quietly under closed JPMS modules).
 - Log4j2 adapter drops the trailing throwable from `args=` (Log4j2 keeps it inside
   `Message.getParameters()` after extraction).
 - Dependency refresh via Dependabot (Logback 1.5.38, AssertJ 3.27.7, Surefire 3.5.6,
   JaCoCo 0.8.15, actions/checkout v7, setup-java v5).
+
+[0.2.0]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.2.0
 
 ## [0.1.0] — 2026-07-09
 

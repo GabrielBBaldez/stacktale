@@ -79,8 +79,7 @@ INFO stacktale -- AI error report #c73cf755 → ./errors-ai.log
 
 ## Quickstart
 
-> Not on Maven Central yet (planned). For now:
-> `git clone https://github.com/GabrielBBaldez/stacktale && cd stacktale && mvn install`
+All artifacts are on Maven Central.
 
 ### Spring Boot (zero config)
 
@@ -88,7 +87,7 @@ INFO stacktale -- AI error report #c73cf755 → ./errors-ai.log
 <dependency>
   <groupId>io.github.gabrielbbaldez</groupId>
   <artifactId>stacktale-spring-boot-starter</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -104,7 +103,7 @@ via `stacktale.*` properties in `application.yml`.
 <dependency>
   <groupId>io.github.gabrielbbaldez</groupId>
   <artifactId>stacktale</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
