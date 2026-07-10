@@ -33,6 +33,14 @@
       <version>1.15.10</version>
       <scope>test</scope>
     </dependency>
+    <!-- The most common production javaagent; AgentCoexistenceIT runs stacktale-agent
+         alongside it in a real subprocess JVM to prove they don't fight. -->
+    <dependency>
+      <groupId>io.opentelemetry.javaagent</groupId>
+      <artifactId>opentelemetry-javaagent</artifactId>
+      <version>2.10.0</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>io.github.gabrielbbaldez</groupId>
       <artifactId>stacktale</artifactId>
@@ -55,10 +63,32 @@
 
   <build>
     <plugins>
+      <!-- expose the OTel javaagent jar path as a property for AgentCoexistenceIT -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>resolve-agent-jars</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>properties</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
         <version>3.5.6</version>
+        <configuration>
+          <systemPropertyVariables>
+            <!-- the shaded agent jar (this module) and the OTel javaagent, for the
+                 real two-agent subprocess AgentCoexistenceIT launches -->
+            <stacktale.agent.jar>${project.build.directory}/${project.build.finalName}.jar</stacktale.agent.jar>
+            <otel.javaagent.jar>${io.opentelemetry.javaagent:opentelemetry-javaagent:jar}</otel.javaagent.jar>
+          </systemPropertyVariables>
+        </configuration>
         <executions>
           <execution>
             <goals>

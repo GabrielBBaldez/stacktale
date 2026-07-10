@@ -237,6 +237,14 @@ values pass through redaction, and real parameter names appear when the app is c
 with `-parameters` (`argN` otherwise). Scope note: arguments, not full local variables —
 that trade-off is what keeps it safe and free.
 
+**Alongside another agent (OpenTelemetry, Datadog).** Production JVMs usually already run
+a vendor agent, and stacktale-agent coexists with one — a CI test
+(`AgentCoexistenceIT`) runs it behind the OpenTelemetry javaagent and confirms both load
+and stacktale still captures. **Order it last** so it layers onto the (already
+instrumented) classes: `-javaagent:otel.jar -javaagent:stacktale-agent.jar=...`. The
+capture advice fires only on the exceptional path, so the added cost lands on throws, not
+the happy path — measured at ≈2µs per throw with both agents attached.
+
 ## Reactive (WebFlux)
 
 The starter detects reactive apps: a `WebFilter` opens each story with the request line
