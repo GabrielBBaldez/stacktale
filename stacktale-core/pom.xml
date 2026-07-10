@@ -16,6 +16,10 @@
   <name>stacktale-core</name>
   <description>Framework-agnostic heart of stacktale: the st/ report pipeline, renderer, story, distiller, dedup, redaction.</description>
 
+  <properties>
+    <stacktale.module.name>io.github.gabrielbbaldez.stacktale</stacktale.module.name>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.slf4j</groupId>

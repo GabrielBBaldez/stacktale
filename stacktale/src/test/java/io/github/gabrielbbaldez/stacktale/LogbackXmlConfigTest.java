@@ -33,7 +33,7 @@ class LogbackXmlConfigTest {
         Path file = dir.resolve("errors-ai.log");
         String xml = """
                 <configuration>
-                  <appender name="STACKTALE" class="io.github.gabrielbbaldez.stacktale.StacktaleAppender">
+                  <appender name="STACKTALE" class="io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender">
                     <file>%s</file>
                     <appPackages>com.acme</appPackages>
                     <storySize>10</storySize>

@@ -16,6 +16,10 @@
   <name>stacktale-spring-boot-starter</name>
   <description>Zero-config stacktale for Spring Boot: auto-registered appender + HTTP request lines in the story.</description>
 
+  <properties>
+    <stacktale.module.name>io.github.gabrielbbaldez.stacktale.spring</stacktale.module.name>
+  </properties>
+
   <dependencyManagement>
     <dependencies>
       <dependency>

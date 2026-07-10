@@ -1,5 +1,9 @@
-package io.github.gabrielbbaldez.stacktale;
+package io.github.gabrielbbaldez.stacktale.logback;
 
+import io.github.gabrielbbaldez.stacktale.Csv;
+import io.github.gabrielbbaldez.stacktale.LogEventData;
+import io.github.gabrielbbaldez.stacktale.ReportPipeline;
+import io.github.gabrielbbaldez.stacktale.UncaughtHandler;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;

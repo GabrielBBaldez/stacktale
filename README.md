@@ -109,7 +109,7 @@ via `stacktale.*` properties in `application.yml`.
 ```
 
 ```xml
-<appender name="STACKTALE" class="io.github.gabrielbbaldez.stacktale.StacktaleAppender">
+<appender name="STACKTALE" class="io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender">
   <appPackages>com.your.app</appPackages> <!-- optional but recommended -->
 </appender>
 
@@ -337,6 +337,27 @@ each backed by a passing build:
 
 The Spring Boot starter follows Boot's own Logback version (1.5 on Boot 3.4+); the
 `stacktale` and `stacktale-log4j2` artifacts work down to Logback 1.4 on their own.
+
+### Java modules (JPMS)
+
+Every jar declares a stable `Automatic-Module-Name`, so stacktale works on the module
+path as well as the classpath — a resolution smoke test in CI pins this:
+
+| Artifact | Module name |
+|---|---|
+| `stacktale-core` | `io.github.gabrielbbaldez.stacktale` |
+| `stacktale` (Logback) | `io.github.gabrielbbaldez.stacktale.logback` |
+| `stacktale-log4j2` | `io.github.gabrielbbaldez.stacktale.log4j2` |
+| `stacktale-spring-boot-starter` | `io.github.gabrielbbaldez.stacktale.spring` |
+| `stacktale-mcp` | `io.github.gabrielbbaldez.stacktale.mcp` |
+| `stacktale-agent` | `io.github.gabrielbbaldez.stacktale.agent` |
+
+> **Migrating to 0.5.0:** the Logback appender moved from
+> `io.github.gabrielbbaldez.stacktale.StacktaleAppender` to
+> `io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender` (it used to share a
+> package with the core, a split package that JPMS forbids). Update the `class="…"` in
+> your `logback.xml` — a one-line change. The Spring Boot starter and Log4j2 configs are
+> unaffected.
 
 ## Roadmap
 

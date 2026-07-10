@@ -16,6 +16,10 @@
   <name>stacktale-agent</name>
   <description>Optional -javaagent that captures method arguments at the throw site, feeding the captured: section of stacktale reports.</description>
 
+  <properties>
+    <stacktale.module.name>io.github.gabrielbbaldez.stacktale.agent</stacktale.module.name>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>net.bytebuddy</groupId>
@@ -87,6 +91,7 @@
                     <Premain-Class>io.github.gabrielbbaldez.stacktale.agent.StacktaleAgent</Premain-Class>
                     <Can-Redefine-Classes>false</Can-Redefine-Classes>
                     <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                    <Automatic-Module-Name>io.github.gabrielbbaldez.stacktale.agent</Automatic-Module-Name>
                   </manifestEntries>
                 </transformer>
               </transformers>

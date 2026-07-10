@@ -3,7 +3,7 @@ package io.github.gabrielbbaldez.stacktale.agent;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-import io.github.gabrielbbaldez.stacktale.StacktaleAppender;
+import io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender;
 import io.github.gabrielbbaldez.stacktale.agent.fixture.OrderFlow;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import org.junit.jupiter.api.BeforeAll;

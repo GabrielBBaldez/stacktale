@@ -146,7 +146,7 @@ log event ──► StacktaleAppender.append()
 Everything is optional; configured as standard Logback appender properties.
 
 ```xml
-<appender name="STACKTALE" class="io.github.gabrielbbaldez.stacktale.StacktaleAppender">
+<appender name="STACKTALE" class="io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender">
   <file>errors-ai.log</file>              <!-- default: ./errors-ai.log -->
   <appPackages>com.acme.shop</appPackages><!-- marks "← YOUR CODE"; default: heuristic (non-framework = app) -->
   <storySize>15</storySize>               <!-- events kept per context -->

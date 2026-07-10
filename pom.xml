@@ -95,12 +95,31 @@
             </execution>
           </executions>
         </plugin>
+        <plugin>
+          <!-- Stable JPMS module names: each jar declares Automatic-Module-Name so modular
+               apps can `requires` it. The per-module value lives in ${stacktale.module.name}. -->
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.4.1</version>
+          <configuration>
+            <archive>
+              <manifestEntries>
+                <Automatic-Module-Name>${stacktale.module.name}</Automatic-Module-Name>
+              </manifestEntries>
+            </archive>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <!-- activates the pluginManagement config (Automatic-Module-Name) on default-jar -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>org.jacoco</groupId>

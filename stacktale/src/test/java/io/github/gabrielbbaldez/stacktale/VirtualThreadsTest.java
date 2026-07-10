@@ -1,4 +1,5 @@
 package io.github.gabrielbbaldez.stacktale;
+import io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;

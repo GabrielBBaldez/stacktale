@@ -16,6 +16,10 @@
   <name>stacktale</name>
   <description>Stack traces that tell the tale — a Logback appender that turns Java errors into AI-ready reports.</description>
 
+  <properties>
+    <stacktale.module.name>io.github.gabrielbbaldez.stacktale.logback</stacktale.module.name>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.github.gabrielbbaldez</groupId>
@@ -52,4 +56,44 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!-- expose each dependency jar as ${groupId:artifactId:type} so the JPMS IT can
+           point a ModuleFinder at the real core jar (with its Automatic-Module-Name). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>resolve-module-jars</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>properties</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- JpmsModulePathIT needs the packaged jars, so it runs post-package via failsafe -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.5.6</version>
+        <configuration>
+          <systemPropertyVariables>
+            <stacktale.core.jar>${io.github.gabrielbbaldez:stacktale-core:jar}</stacktale.core.jar>
+            <stacktale.logback.jar>${project.build.directory}/${project.build.finalName}.jar</stacktale.logback.jar>
+          </systemPropertyVariables>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

@@ -2,7 +2,7 @@ package io.github.gabrielbbaldez.stacktale.spring;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-import io.github.gabrielbbaldez.stacktale.StacktaleAppender;
+import io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

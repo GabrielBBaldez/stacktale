@@ -2,7 +2,7 @@ package io.github.gabrielbbaldez.stacktale.spring;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-import io.github.gabrielbbaldez.stacktale.StacktaleAppender;
+import io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;

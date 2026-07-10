@@ -16,6 +16,10 @@
   <name>stacktale-log4j2</name>
   <description>Log4j2 appender for stacktale: AI-ready error reports for apps logging through Log4j2.</description>
 
+  <properties>
+    <stacktale.module.name>io.github.gabrielbbaldez.stacktale.log4j2</stacktale.module.name>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.github.gabrielbbaldez</groupId>
