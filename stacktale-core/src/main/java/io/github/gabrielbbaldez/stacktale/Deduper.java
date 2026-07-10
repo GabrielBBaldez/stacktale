@@ -55,10 +55,17 @@ final class Deduper {
         boolean firstRepeat = s.count == 2;
         if (firstRepeat || now - s.lastSummary >= summaryThrottleMillis) {
             s.lastSummary = now;
-            s.lastWrittenCount = s.count;
+            // lastWrittenCount is advanced only after the summary is durably written
+            // (confirmWritten) — otherwise a failed write would silently lose the count
             return new Decision(Kind.SUMMARY, s.count, now);
         }
         return new Decision(Kind.SILENT, s.count, now);
+    }
+
+    /** Records that a summary line reflecting {@code count} reached the file. */
+    synchronized void confirmWritten(String fingerprint, int count) {
+        Stats s = stats.get(fingerprint);
+        if (s != null && count > s.lastWrittenCount) s.lastWrittenCount = count;
     }
 
     /** Counters ahead of what the file shows (throttled bursts) — drained on shutdown. */

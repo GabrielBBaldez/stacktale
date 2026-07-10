@@ -39,22 +39,35 @@ public final class StacktaleAgent {
                     + "use -javaagent:stacktale-agent.jar=packages=com.your.app (';' separates multiple). Agent inactive.");
             return;
         }
-        install(instrumentation, packages);
-        System.err.println("[stacktale-agent] capturing throw-site arguments in packages " + packages);
+        // An exception out of premain aborts the JVM per the java.lang.instrument spec:
+        // a broken agent must disable itself, never take down a healthy application.
+        try {
+            install(instrumentation, packages);
+            System.err.println("[stacktale-agent] capturing throw-site arguments in packages " + packages);
+        } catch (Throwable t) {
+            System.err.println("[stacktale-agent] failed to install, running without capture: " + t);
+        }
     }
 
     /** Shared by premain and tests (which attach via ByteBuddyAgent). */
     public static void install(Instrumentation instrumentation, List<String> packages) {
         ElementMatcher.Junction<TypeDescription> types = ElementMatchers.none();
         for (String pkg : packages) {
-            types = types.or(ElementMatchers.nameStartsWith(pkg));
+            // require a package boundary: packages=com.acme.orders must NOT swallow
+            // com.acme.ordersprocessing — match the package prefix OR the exact type name
+            types = types.or(ElementMatchers.nameStartsWith(pkg + ".").or(ElementMatchers.named(pkg)));
         }
-        new AgentBuilder.Default()
-                .disableClassFormatChanges()
-                .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
-                .type(types)
-                .transform((builder, typeDescription, classLoader, module, protectionDomain) ->
-                        builder.visit(Advice.to(CaptureAdvice.class).on(isMethod().and(not(isAbstract())))))
+        AgentBuilder builder = new AgentBuilder.Default().disableClassFormatChanges();
+        // Retransformation lets us instrument classes already loaded before the agent —
+        // but only when the runtime and this jar's manifest both allow it. A premain
+        // agent works fine without it (classes are transformed as they load), so degrade
+        // gracefully instead of failing when retransform isn't available.
+        if (instrumentation.isRetransformClassesSupported()) {
+            builder = builder.with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION);
+        }
+        builder.type(types)
+                .transform((b, typeDescription, classLoader, module, protectionDomain) ->
+                        b.visit(Advice.to(CaptureAdvice.class).on(isMethod().and(not(isAbstract())))))
                 .installOn(instrumentation);
     }
 

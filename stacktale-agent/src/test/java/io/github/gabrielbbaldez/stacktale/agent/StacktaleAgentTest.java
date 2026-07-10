@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * Issue-#27 acceptance: with the agent attached, a failure that logged NOTHING still
@@ -38,6 +39,18 @@ class StacktaleAgentTest {
         } catch (NullPointerException e) {
             return e;
         }
+    }
+
+    @Test
+    void installIsResilientAndPackageMatchingRespectsBoundaries() {
+        Instrumentation instrumentation = ByteBuddyAgent.install();
+        // a sibling package sharing the literal prefix must NOT be swallowed
+        assertThatCode(() -> StacktaleAgent.install(instrumentation,
+                List.of("io.github.gabrielbbaldez.stacktale.agent.fixture")))
+                .doesNotThrowAnyException();
+        // premain must never propagate — a bad config disables the agent, never aborts the JVM
+        assertThatCode(() -> StacktaleAgent.premain("packages=", instrumentation))
+                .doesNotThrowAnyException();
     }
 
     @Test

@@ -30,15 +30,20 @@ public final class StacktaleWebFluxFilter implements WebFilter {
         if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString().substring(0, 8);
         }
-        String line = exchange.getRequest().getMethod() + " " + exchange.getRequest().getURI().getRawPath();
-
-        String previous = MDC.get(TRACE_KEY);
-        MDC.put(TRACE_KEY, traceId);
+        // opening the story is best-effort enrichment — MDC.put throws when no MDCAdapter
+        // is bound; a broken/partial SLF4J binding must never fail the actual HTTP request
         try {
-            log.info("{}", line);
-        } finally {
-            if (previous != null) MDC.put(TRACE_KEY, previous);
-            else MDC.remove(TRACE_KEY);
+            String line = exchange.getRequest().getMethod() + " " + exchange.getRequest().getURI().getRawPath();
+            String previous = MDC.get(TRACE_KEY);
+            MDC.put(TRACE_KEY, traceId);
+            try {
+                log.info("{}", line);
+            } finally {
+                if (previous != null) MDC.put(TRACE_KEY, previous);
+                else MDC.remove(TRACE_KEY);
+            }
+        } catch (Throwable t) {
+            // fall through: the request continues, only the story-opening line is skipped
         }
 
         String finalTraceId = traceId;

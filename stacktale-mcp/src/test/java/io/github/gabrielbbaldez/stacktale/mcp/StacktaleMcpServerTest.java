@@ -99,4 +99,34 @@ class StacktaleMcpServerTest {
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"nope\",\"arguments\":{}}}");
         assertThat(r[0].has("error")).isTrue();
     }
+
+    @Test
+    void unknownMethodUsesMethodNotFoundCode() throws Exception {
+        JsonNode[] r = roundTrip(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"does/not/exist\",\"params\":{}}");
+        assertThat(r[0].at("/error/code").asInt()).isEqualTo(-32601); // Method not found, per JSON-RPC 2.0
+    }
+
+    @Test
+    void scansContiguousBackupsBeyondNine(@TempDir Path dir) throws Exception {
+        // a report living in .12 (maxBackups > 9) must still be visible
+        Files.writeString(dir.resolve("errors-ai.log.12"), """
+                ━━━ ERROR #old01234 ━━━ 2026-07-01 09:00:00.000 thread=main ━━━
+                RuntimeException: ancient failure
+                ━━━ END #old01234 ━━━
+                """, StandardCharsets.UTF_8);
+        for (int i = 1; i <= 12; i++) {
+            if (i == 12) continue;
+            Files.writeString(dir.resolve("errors-ai.log." + i), "filler\n", StandardCharsets.UTF_8);
+        }
+        Files.writeString(dir.resolve("errors-ai.log"), ST_FILE, StandardCharsets.UTF_8);
+
+        StacktaleMcpServer server = new StacktaleMcpServer(dir.resolve("errors-ai.log"));
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        server.serve(new ByteArrayInputStream(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"get_report\",\"arguments\":{\"id\":\"old01234\"}}}\n"
+                        .getBytes(StandardCharsets.UTF_8)), out);
+        JsonNode r = JSON.readTree(out.toString(StandardCharsets.UTF_8).trim());
+        assertThat(r.at("/result/content/0/text").asText()).contains("ancient failure");
+    }
 }

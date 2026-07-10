@@ -71,13 +71,21 @@ public final class StacktaleMcpServer {
             response.set("id", idNode);
             try {
                 response.set("result", handle(method, request.path("params")));
+            } catch (UnknownMethodException e) {
+                ObjectNode error = response.putObject("error");
+                error.put("code", -32601); // Method not found (JSON-RPC 2.0)
+                error.put("message", e.getMessage());
             } catch (Exception e) {
                 ObjectNode error = response.putObject("error");
-                error.put("code", -32603);
+                error.put("code", -32603); // Internal error
                 error.put("message", String.valueOf(e.getMessage()));
             }
             writer.println(JSON.writeValueAsString(response));
         }
+    }
+
+    private static final class UnknownMethodException extends RuntimeException {
+        UnknownMethodException(String message) { super(message); }
     }
 
     private JsonNode handle(String method, JsonNode params) throws IOException {
@@ -86,7 +94,7 @@ public final class StacktaleMcpServer {
             case "tools/list" -> toolsList();
             case "tools/call" -> toolsCall(params);
             case "ping" -> JSON.createObjectNode();
-            default -> throw new IllegalArgumentException("unknown method: " + method);
+            default -> throw new UnknownMethodException("unknown method: " + method);
         };
     }
 

@@ -140,6 +140,7 @@ public final class ReportPipeline {
             Decision decision = deduper.decide(fingerprint);
             switch (decision.kind()) {
                 case REPORT -> {
+                    String rendered;
                     try {
                         Map<String, String> fields = settings.captureExceptionFields()
                                 ? FieldExtractor.extractChain(throwable)
@@ -148,20 +149,26 @@ public final class ReportPipeline {
                                 stack, event.messagePattern(), event.args(), event.loggerName(),
                                 event.mdc(), fields, AgentCaptures.forChain(throwable),
                                 storyBuffer.storyFor(event), env.envLine());
-                        String rendered = renderer.render(report);
+                        rendered = renderer.render(report);
                         writer.append(rendered);
-                        if (settings.emitReportsToLogger()) host.emitReport(rendered);
                     } catch (Throwable t) {
-                        // don't leave the dedup window believing a report exists that was
-                        // never written — the next occurrence must get a fresh chance
+                        // the report was NOT durably written — don't leave the dedup window
+                        // believing it exists; the next occurrence must get a fresh chance
                         deduper.rollback(fingerprint);
                         throw t;
                     }
+                    // past this point the report is on disk: a failing shipper must not
+                    // undo dedup state (that would duplicate the next occurrence's report)
                     lastReportOnThread.set(System.currentTimeMillis());
                     host.selfLog("AI error report #" + fingerprint + " → " + settings.file());
+                    if (settings.emitReportsToLogger()) host.emitReport(rendered);
                 }
-                case SUMMARY -> writer.append(
-                        renderer.renderSummary(fingerprint, decision.count(), decision.lastSeenMillis()));
+                case SUMMARY -> {
+                    writer.append(renderer.renderSummary(fingerprint, decision.count(), decision.lastSeenMillis()));
+                    // only now is the count durably on file; a failed append above throws
+                    // to the outer catch and leaves it pending for close()'s drainPending()
+                    deduper.confirmWritten(fingerprint, decision.count());
+                }
                 case SILENT -> { /* counted; nothing to write */ }
             }
         } catch (Throwable t) {

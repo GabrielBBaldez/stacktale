@@ -37,10 +37,15 @@ final class StReportFile {
         Map<String, StReport> byId = new LinkedHashMap<>();
         // oldest backup first so the main file's newer data wins ordering naturally
         List<Path> sources = new ArrayList<>();
-        for (int i = 9; i >= 1; i--) {
+        // scan contiguous .N backups (ReportWriter's maxBackups is unbounded); stop at the
+        // first gap so a huge configured retention doesn't mean scanning thousands of paths
+        List<Path> backups = new ArrayList<>();
+        for (int i = 1; ; i++) {
             Path backup = file.resolveSibling(file.getFileName() + "." + i);
-            if (Files.exists(backup)) sources.add(backup);
+            if (!Files.exists(backup)) break;
+            backups.add(backup);
         }
+        for (int i = backups.size() - 1; i >= 0; i--) sources.add(backups.get(i)); // oldest first
         if (Files.exists(file)) sources.add(file);
 
         for (Path source : sources) {

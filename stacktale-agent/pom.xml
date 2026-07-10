@@ -53,6 +53,19 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.5.6</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <version>3.6.0</version>
         <executions>
@@ -73,7 +86,7 @@
                   <manifestEntries>
                     <Premain-Class>io.github.gabrielbbaldez.stacktale.agent.StacktaleAgent</Premain-Class>
                     <Can-Redefine-Classes>false</Can-Redefine-Classes>
-                    <Can-Retransform-Classes>false</Can-Retransform-Classes>
+                    <Can-Retransform-Classes>true</Can-Retransform-Classes>
                   </manifestEntries>
                 </transformer>
               </transformers>
