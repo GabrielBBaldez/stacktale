@@ -5,6 +5,33 @@ All notable changes to stacktale are documented here. The format follows
 [SemVer](https://semver.org/). The report format (`st/1`) is versioned independently
 and pinned by golden-file tests.
 
+## [0.4.0] — 2026-07-10
+
+Production hardening and the agentic loop.
+
+- **MCP push notifications**: the server exposes the report file as an MCP resource with
+  subscribe support — your AI assistant is notified the moment a new error lands (file
+  watcher → `notifications/resources/updated`) instead of polling. `STACKTALE_FILE` env
+  var as an alternative to `--file`; full per-client setup in `docs/mcp-setup.md`.
+- **Error-storm control**: `maxReportsPerMinute` (0 = off) caps full reports; a cascade
+  of *distinct* errors becomes a throttled `storm: N suppressed` line instead of flooding
+  the file and rotating history away when you need it most.
+- **Agent filters**: `-javaagent` args gained `excludes=`, `maxFrames=`,
+  `maxValueLength=`, and `renderToString=false` — a privacy mode that records an object's
+  type and nullness but never its `toString()`.
+- **Reactive (WebFlux)**: a reactive filter opens the story with the request line and
+  propagates the trace id across scheduler hops via Reactor context propagation.
+- **Formal `st/1` specification** (`docs/FORMAT.md`) — the normative format spec, now that
+  external contributors and the MCP server parse it. The golden files are its conformance
+  suite.
+- **Compatibility matrix** in CI (weekly + on POM changes): Logback 1.4/1.5, Log4j2 2.20,
+  Spring Boot 3.2/3.3/3.5 — supported ranges documented and each backed by a passing build.
+- **One-click release** workflow (`workflow_dispatch`).
+- Container-echo suppression and burst-counter flush (from real-world dogfooding); Log4j2
+  non-parameterized message types; non-English redaction keywords.
+
+[0.4.0]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.4.0
+
 ## [0.3.1] — 2026-07-10
 
 Patch release — fixes a critical agent startup bug in 0.3.0. **If you use
