@@ -146,3 +146,66 @@ suppressed to protect the file. The errors still happened — this line is the a
   semantics) bumps to `st/2` and is called out in the changelog and design doc.
 - The golden files are the conformance suite: a diff there is either a bug or a
   deliberate, documented format change.
+
+## 7. JSON output (`st-json/1`)
+
+Set `format=json` (an appender attribute, or `stacktale.format` with the Spring starter,
+or the `…StacktaleJulHandler.format` property) to write **NDJSON** instead of the text
+blocks: one compact JSON object per line. It carries the same information, but every
+section is an addressable field — for parsers, pipelines and dashboards rather than an LLM
+reading raw. (The text format is denser per token, so it stays the default.) The bundled
+`stacktale-mcp` server reads the **text** format; with `format=json` you consume
+`errors-ai.log` with your own JSON tooling.
+
+Each line is one entry, discriminated by `type`:
+
+- `header` — `{"type":"header","format":"st-json/1","docs":"…"}` (once per file)
+- `report` — a full error report (below)
+- `repeat` — `{"type":"repeat","id":"…","count":N,"last":"<ISO-8601>"}`
+- `session` — `{"type":"session","ts":"<ISO-8601>","pid":N}`
+- `storm` — `{"type":"storm","suppressed":N,"limit":M}`
+
+A `report` object (pretty-printed here; on disk it is one line):
+
+```json
+{
+  "type": "report",
+  "id": "a1b2c3d4",
+  "ts": "2026-07-10T20:16:40.412Z",
+  "thread": "http-nio-8080-exec-2",
+  "error": {
+    "type": "IllegalStateException",
+    "message": "payment gateway refused",
+    "culprit": { "frame": "PaymentService.charge(PaymentService.java:44)", "appCode": true },
+    "wrappedBy": ["CheckoutException(\"checkout failed\") at CheckoutService.confirm(…)"]
+  },
+  "log": { "pattern": "charge failed for order {}", "args": ["889"], "logger": "com.acme.shop.PaymentService" },
+  "mdc": { "traceId": "7c2e" },
+  "fields": { "orderId": "889", "retryable": "false" },
+  "captured": ["PaymentService.charge(orderId=889, amount=149.90)"],
+  "recurrence": { "count": 3, "firstSeen": "2026-07-10T20:16:40.000Z" },
+  "story": {
+    "label": "traceId=7c2e",
+    "omittedByAge": 2,
+    "events": [
+      { "ts": "…", "level": "INFO", "logger": "CheckoutService", "message": "confirming order 889" },
+      { "ts": "…", "level": "ERROR", "logger": "PaymentService", "message": "charge failed for order 889", "thisError": true }
+    ]
+  },
+  "stack": { "shown": 1, "total": 32, "frames": ["…"], "suppressed": [] },
+  "env": "app=shop-api 1.4.2 (git 7e3c1f) | java 21 | profile=prod | linux"
+}
+```
+
+Rules:
+
+- Timestamps are ISO-8601 with fixed millisecond precision (`.SSS`) and an offset (`Z` for UTC).
+- Optional members (`mdc`, `fields`, `captured`, `recurrence`, `error.wrappedBy`,
+  `error.culprit`, `stack`, `env`) are **omitted** when empty — absence is the signal.
+- A no-throwable report has `"error": { "noException": true, "message": "…" }` and no `stack`.
+- Redaction is identical to the text format: a secret-named key masks its value, a
+  secret-position arg becomes `███`, secret-shaped values are redacted. Multi-line values
+  keep their newlines (JSON-escaped) instead of being flattened.
+- The `logger` is the full name (the text format abbreviates it for display; JSON does not).
+- Same version discipline as §6: additive members don't bump the major; a breaking change
+  bumps to `st-json/2`.

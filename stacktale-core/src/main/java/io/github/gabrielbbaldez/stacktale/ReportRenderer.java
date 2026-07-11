@@ -12,7 +12,7 @@ import java.util.TreeMap;
  * Pure formatter for the st/1 report format. The output of this class is a public,
  * versioned API — golden-file tests pin it, and changes mean a format version bump.
  */
-final class ReportRenderer {
+final class ReportRenderer implements Renderer {
 
     static final String FORMAT_VERSION = "st/1";
 
@@ -39,7 +39,8 @@ final class ReportRenderer {
         return redactor.redact(flat(s));
     }
 
-    String render(Report r) {
+    @Override
+    public String render(Report r) {
         StringBuilder sb = new StringBuilder(1024);
         sb.append("━━━ ERROR #").append(r.id()).append(" ━━━ ")
                 .append(dateTime.format(Instant.ofEpochMilli(r.epochMillis())))
@@ -114,12 +115,14 @@ final class ReportRenderer {
         return sb.toString();
     }
 
-    String renderSummary(String id, int count, long lastMillis) {
+    @Override
+    public String renderSummary(String id, int count, long lastMillis) {
         return "━ #" + id + " repeated " + count + "× (last "
                 + time.format(Instant.ofEpochMilli(lastMillis)) + ") ━\n";
     }
 
-    String fileHeader() {
+    @Override
+    public String fileHeader() {
         return """
                 # AI-oriented error reports (format st/1, https://github.com/GabrielBBaldez/stacktale)
                 # Each report is delimited by "━━━ ERROR #<id> ━━━" ... "━━━ END #<id> ━━━".
@@ -133,12 +136,14 @@ final class ReportRenderer {
                 """;
     }
 
-    String sessionMarker(long epochMillis, long pid) {
+    @Override
+    public String sessionMarker(long epochMillis, long pid) {
         return "─── app start " + dateTime.format(Instant.ofEpochMilli(epochMillis))
                 + " (pid " + pid + ") ───\n";
     }
 
-    String stormLine(int suppressed, int limit) {
+    @Override
+    public String stormLine(int suppressed, int limit) {
         return "━ storm: " + suppressed + " report(s) suppressed (rate limit " + limit + "/min) ━\n";
     }
 
@@ -178,15 +183,11 @@ final class ReportRenderer {
         }
     }
 
-    /** Matches a secret-ish keyword sitting right before a {} placeholder in the pattern. */
-    private static final java.util.regex.Pattern SECRET_BEFORE_PLACEHOLDER = java.util.regex.Pattern.compile(
-            "(?i)\\b(" + Redactor.SECRET_KEYWORDS + ")s?\\b\\s*[=:]?\\s*$");
-
     private String renderArgs(String pattern, Object[] args) {
         if (args == null || args.length == 0) return "";
         // "password={}" puts the secret in the ARG, where name-based redaction can't see
         // it — the pattern tells us which arg positions hold secrets
-        java.util.Set<Integer> secretIndexes = secretArgIndexes(pattern);
+        java.util.Set<Integer> secretIndexes = redactor.secretArgIndexes(pattern);
         StringBuilder sb = new StringBuilder();
         int shown = Math.min(args.length, MAX_ARGS);
         for (int i = 0; i < shown; i++) {
@@ -207,20 +208,6 @@ final class ReportRenderer {
         }
         if (args.length > MAX_ARGS) sb.append(", …+").append(args.length - MAX_ARGS);
         return sb.toString();
-    }
-
-    private java.util.Set<Integer> secretArgIndexes(String pattern) {
-        if (!redactor.isEnabled() || pattern == null || pattern.indexOf('{') < 0) return java.util.Set.of();
-        java.util.Set<Integer> out = new java.util.HashSet<>();
-        int index = 0;
-        int from = 0;
-        int at;
-        while ((at = pattern.indexOf("{}", from)) >= 0) {
-            if (SECRET_BEFORE_PLACEHOLDER.matcher(pattern.substring(0, at)).find()) out.add(index);
-            index++;
-            from = at + 2;
-        }
-        return out;
     }
 
     /** One line per section is part of the format: embedded newlines become literal {@code \n}. */

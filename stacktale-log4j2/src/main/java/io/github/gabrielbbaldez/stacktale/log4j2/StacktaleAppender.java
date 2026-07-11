@@ -138,6 +138,8 @@ public final class StacktaleAppender extends AbstractAppender {
         @PluginBuilderAttribute private boolean emitReportsToLogger = false;
         /** Cap full reports per minute (0 = unlimited); excess errors become a storm line. */
         @PluginBuilderAttribute private int maxReportsPerMinute = 0;
+        /** {@code text} (default, densest for an LLM) or {@code json} (st-json/1 NDJSON, for parsers). */
+        @PluginBuilderAttribute private String format = "text";
 
         @Override
         public StacktaleAppender build() {
@@ -182,6 +184,7 @@ public final class StacktaleAppender extends AbstractAppender {
                     .containerLoggers(containers)
                     .emitReportsToLogger(emitReportsToLogger)
                     .maxReportsPerMinute(maxReportsPerMinute)
+                    .jsonFormat("json".equalsIgnoreCase(format))
                     .build();
             ReportPipeline pipeline = ReportPipeline.create(settings, new ReportPipeline.Host() {
                 @Override

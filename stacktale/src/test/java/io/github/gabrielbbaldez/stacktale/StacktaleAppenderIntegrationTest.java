@@ -39,6 +39,38 @@ class StacktaleAppenderIntegrationTest {
         return appender;
     }
 
+    @Test
+    void jsonFormatWritesNdjsonInsteadOfTheTextBlock(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("errors-ai.log");
+        ctx = new LoggerContext();
+        ctx.setMDCAdapter(MDC.getMDCAdapter());
+        StacktaleAppender appender = new StacktaleAppender();
+        appender.setContext(ctx);
+        appender.setFile(file.toString());
+        appender.setAppPackages("io.github.gabrielbbaldez");
+        appender.setInstallUncaughtHandler(false);
+        appender.setFormat("json"); // must be set before start() — the pipeline is built there
+        appender.start();
+        ctx.getLogger(Logger.ROOT_LOGGER_NAME).addAppender(appender);
+        ctx.getLogger(Logger.ROOT_LOGGER_NAME).setLevel(Level.INFO);
+
+        ctx.getLogger("com.acme.Svc").error("charge failed", new IllegalStateException("gateway refused"));
+        appender.stop();
+
+        var lines = Files.readAllLines(file, StandardCharsets.UTF_8).stream()
+                .filter(s -> !s.isBlank()).toList();
+        assertThat(lines).isNotEmpty();
+        // every entry is a standalone JSON object (NDJSON), header and session included
+        assertThat(lines).allSatisfy(line ->
+                assertThat(line.strip()).startsWith("{").endsWith("}"));
+        assertThat(lines).anySatisfy(line -> assertThat(line)
+                .contains("\"type\":\"report\"")
+                .contains("\"error\":{\"type\":\"IllegalStateException\"")
+                .contains("\"message\":\"gateway refused\""));
+        // genuinely JSON — the text delimiter is nowhere in the file
+        assertThat(Files.readString(file)).doesNotContain("━━━ ERROR #");
+    }
+
     private Exception wrappedNpe() {
         try {
             try {

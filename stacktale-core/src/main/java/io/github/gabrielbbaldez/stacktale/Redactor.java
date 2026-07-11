@@ -91,6 +91,41 @@ final class Redactor {
         return enabled;
     }
 
+    /** Matches a secret-ish keyword sitting right before a {@code {}} placeholder in the pattern. */
+    private static final Pattern SECRET_BEFORE_PLACEHOLDER = Pattern.compile(
+            "(?i)\\b(" + SECRET_KEYWORDS + ")s?\\b\\s*[=:]?\\s*$");
+
+    /**
+     * Arg positions whose SLF4J {@code {}} placeholder is preceded by a secret keyword
+     * ({@code "password={}"} hides the secret in the arg, out of reach of the name-based
+     * value rules). Shared by the text and JSON renderers.
+     */
+    private static final Pattern SECRET_KEY = Pattern.compile("(?i)^(" + SECRET_KEYWORDS + ")s?$");
+
+    /**
+     * Whether a whole key name is a credential ({@code password}, {@code apiKey}, …). The
+     * text renderer redacts {@code key=value} as one string so a secret-named key masks its
+     * value; JSON keeps key and value apart, so the JSON renderer asks this instead to avoid
+     * leaking the value of a secret-named field.
+     */
+    boolean isSecretKey(String key) {
+        return enabled && key != null && SECRET_KEY.matcher(key).matches();
+    }
+
+    java.util.Set<Integer> secretArgIndexes(String pattern) {
+        if (!enabled || pattern == null || pattern.indexOf('{') < 0) return java.util.Set.of();
+        java.util.Set<Integer> out = new java.util.HashSet<>();
+        int index = 0;
+        int from = 0;
+        int at;
+        while ((at = pattern.indexOf("{}", from)) >= 0) {
+            if (SECRET_BEFORE_PLACEHOLDER.matcher(pattern.substring(0, at)).find()) out.add(index);
+            index++;
+            from = at + 2;
+        }
+        return out;
+    }
+
     String redact(String s) {
         if (!enabled || s == null || s.isEmpty()) return s;
         try {

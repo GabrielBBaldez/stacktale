@@ -79,6 +79,9 @@ public class StacktaleProperties {
     /** Cap full reports per minute (0 = unlimited); excess errors become a storm line. */
     private int maxReportsPerMinute = 0;
 
+    /** Report format: {@code text} (default, densest for an LLM) or {@code json} (st-json/1 NDJSON). */
+    private String format = "text";
+
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public String getFile() { return file; }
@@ -109,6 +112,8 @@ public class StacktaleProperties {
     public void setRedactPatterns(List<String> redactPatterns) { this.redactPatterns = redactPatterns; }
     public boolean isRedactionCorrelation() { return redactionCorrelation; }
     public void setRedactionCorrelation(boolean redactionCorrelation) { this.redactionCorrelation = redactionCorrelation; }
+    public String getFormat() { return format; }
+    public void setFormat(String format) { this.format = format; }
     public String getCorrelationMdcKeys() { return correlationMdcKeys; }
     public void setCorrelationMdcKeys(String correlationMdcKeys) { this.correlationMdcKeys = correlationMdcKeys; }
     public String getZone() { return zone; }

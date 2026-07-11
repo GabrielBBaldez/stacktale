@@ -318,6 +318,7 @@ Everything is optional — as appender properties in `logback.xml`, or `stacktal
 | `containerLogger` (repeatable) | Tomcat's | Extra logger prefixes treated as container echoes |
 | `emitReportsToLogger` | `false` | Also emit each block as ONE event via logger `stacktale.reports` |
 | `maxReportsPerMinute` | `0` (unlimited) | Cap full reports/min; a cascade of distinct errors becomes a `storm:` line instead of flooding the file |
+| `format` | `text` | `text` (densest for an LLM to read) or `json` ([st-json/1](docs/FORMAT.md) NDJSON, for parsers/pipelines) |
 | `echoSuppressionMillis` | `2000` | Suppress container re-logs of a failure this thread just reported (0 = off) |
 | `requestLogging` *(starter)* | `true` | HTTP request lines into the story |
 

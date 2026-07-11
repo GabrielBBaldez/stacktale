@@ -80,6 +80,7 @@ public class StacktaleAutoConfiguration {
         props.getContainerLoggers().forEach(appender::addContainerLogger);
         appender.setEmitReportsToLogger(props.isEmitReportsToLogger());
         appender.setMaxReportsPerMinute(props.getMaxReportsPerMinute());
+        appender.setFormat(props.getFormat());
         appender.start();
         root.addAppender(appender);
 

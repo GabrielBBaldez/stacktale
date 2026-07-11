@@ -50,6 +50,7 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
             new java.util.ArrayList<>(ReportPipeline.Settings.DEFAULT_CONTAINER_LOGGERS);
     private boolean emitReportsToLogger = false;
     private int maxReportsPerMinute = 0;
+    private boolean jsonFormat = false;
 
     private ReportPipeline pipeline;
     private org.slf4j.Logger selfLogger;
@@ -100,6 +101,7 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
                 .containerLoggers(List.copyOf(containerLoggers))
                 .emitReportsToLogger(emitReportsToLogger)
                 .maxReportsPerMinute(maxReportsPerMinute)
+                .jsonFormat(jsonFormat)
                 .build();
         org.slf4j.Logger reportsLogger = getContext() instanceof ch.qos.logback.classic.LoggerContext lc
                 ? lc.getLogger(ReportPipeline.REPORTS_LOGGER)
@@ -229,4 +231,7 @@ public final class StacktaleAppender extends UnsynchronizedAppenderBase<ILogging
 
     /** Cap full reports per minute (0 = unlimited); excess errors become a storm line. */
     public void setMaxReportsPerMinute(int maxReportsPerMinute) { this.maxReportsPerMinute = maxReportsPerMinute; }
+
+    /** {@code text} (default, densest for an LLM) or {@code json} (st-json/1 NDJSON, for parsers). */
+    public void setFormat(String format) { this.jsonFormat = "json".equalsIgnoreCase(format); }
 }

@@ -44,7 +44,8 @@ public final class ReportPipeline {
             long echoSuppressionMillis,
             List<String> containerLoggers,
             boolean emitReportsToLogger,
-            int maxReportsPerMinute
+            int maxReportsPerMinute,
+            boolean jsonFormat
     ) {
 
         /** Default logger prefixes whose errors are re-logs of an exception the app already reported. */
@@ -92,6 +93,7 @@ public final class ReportPipeline {
             private List<String> containerLoggers = DEFAULT_CONTAINER_LOGGERS;
             private boolean emitReportsToLogger = false;
             private int maxReportsPerMinute = 0;
+            private boolean jsonFormat = false;
 
             public Builder file(String v) { this.file = v; return this; }
             public Builder appPackages(List<String> v) { this.appPackages = v; return this; }
@@ -112,13 +114,15 @@ public final class ReportPipeline {
             public Builder containerLoggers(List<String> v) { this.containerLoggers = v; return this; }
             public Builder emitReportsToLogger(boolean v) { this.emitReportsToLogger = v; return this; }
             public Builder maxReportsPerMinute(int v) { this.maxReportsPerMinute = v; return this; }
+            public Builder jsonFormat(boolean v) { this.jsonFormat = v; return this; }
 
             public Settings build() {
                 return new Settings(file, appPackages, storySize, storyWindowMillis, dedupWindowMillis,
                         maxFileBytes, maxBackups, truncateOnStart, reportErrorsWithoutThrowable,
                         captureExceptionFields, redactionEnabled, redactPatterns, redactionCorrelation,
                         correlationMdcKeys, zone,
-                        echoSuppressionMillis, containerLoggers, emitReportsToLogger, maxReportsPerMinute);
+                        echoSuppressionMillis, containerLoggers, emitReportsToLogger, maxReportsPerMinute,
+                        jsonFormat);
             }
         }
     }
@@ -146,14 +150,14 @@ public final class ReportPipeline {
     private final Deduper deduper;
     private final StormLimiter stormLimiter;
     private final EnvCollector env;
-    private final ReportRenderer renderer;
+    private final Renderer renderer;
     private final ReportWriter writer; // null = broken config, pipeline is a no-op
     private final AtomicBoolean warnedOnce = new AtomicBoolean();
     private final AtomicBoolean announced = new AtomicBoolean();
     /** When this thread last produced a full report — used to suppress container echoes. */
     private final ThreadLocal<Long> lastReportOnThread = new ThreadLocal<>();
 
-    private ReportPipeline(Settings settings, Host host, ReportWriter writer, ReportRenderer renderer) {
+    private ReportPipeline(Settings settings, Host host, ReportWriter writer, Renderer renderer) {
         this.settings = settings;
         this.host = host;
         this.renderer = renderer;
@@ -173,7 +177,9 @@ public final class ReportPipeline {
         Redactor redactor = settings.redactionEnabled()
                 ? Redactor.withDefaults(settings.redactPatterns(), settings.redactionCorrelation())
                 : Redactor.disabled();
-        ReportRenderer renderer = new ReportRenderer(settings.zone(), redactor);
+        Renderer renderer = settings.jsonFormat()
+                ? new JsonReportRenderer(settings.zone(), redactor)
+                : new ReportRenderer(settings.zone(), redactor);
         ReportWriter writer;
         try {
             String marker = renderer.sessionMarker(System.currentTimeMillis(), ProcessHandle.current().pid());

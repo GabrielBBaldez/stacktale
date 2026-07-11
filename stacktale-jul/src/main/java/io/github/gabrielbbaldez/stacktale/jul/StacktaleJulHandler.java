@@ -158,6 +158,9 @@ public final class StacktaleJulHandler extends Handler {
         b.maxFileBytes(intProp(m, p + "maxFileSizeMb",
                 ReportPipeline.Settings.DEFAULT_MAX_FILE_SIZE_MB) * 1024L * 1024L);
         b.maxBackups(intProp(m, p + "maxBackups", ReportPipeline.Settings.DEFAULT_MAX_BACKUPS));
+
+        String format = m.getProperty(p + "format");
+        if (format != null) b.jsonFormat("json".equalsIgnoreCase(format.trim()));
         return b.build();
     }
 
