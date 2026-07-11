@@ -84,13 +84,15 @@ class isn't present — again, graceful, no crash.
 
 ## Verifying
 
-A `Deploy`/`native` smoke build lives in `.github/workflows/native.yml`
-(`workflow_dispatch` + weekly — native builds are slow). It compiles a small demo with a
-registered exception and asserts the produced report contains a `fields:` line, proving
-the escape hatch end-to-end. To reproduce locally with a GraalVM JDK:
+With a GraalVM JDK, build your app native the usual way — stacktale needs no special flags
+beyond registering your exception types (above). For a Spring Boot app using the starter:
 
 ```bash
-# from a Spring Boot app that depends on the stacktale starter
 mvn -Pnative native:compile
-./target/your-app     # trigger an error; check ./errors-ai.log
+./target/your-app     # trigger an error, then check ./errors-ai.log
 ```
+
+`env:` should keep your version/git sha (the bundled resource metadata + the starter's
+`RuntimeHintsRegistrar` handle that), and `fields:` should be populated for every exception
+type you registered. There is no native job in CI — native-image needs a GraalVM toolchain
+and minutes per build — so run this check yourself when validating a native deployment.

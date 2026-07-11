@@ -1,5 +1,0 @@
-<configuration>
-  <!-- The stacktale appender is added programmatically in NativeSmokeMain; root keeps no
-       console appender so the smoke output is just the assertion line. -->
-  <root level="INFO"/>
-</configuration>

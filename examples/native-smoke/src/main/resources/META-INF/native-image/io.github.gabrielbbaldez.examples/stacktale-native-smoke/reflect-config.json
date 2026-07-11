@@ -1,8 +1,0 @@
-[
-  {
-    "_comment": "The escape hatch: register your exception types so stacktale's fields: section can read their getters/fields under native-image. Without this, fields: comes back empty (no crash).",
-    "name": "io.github.gabrielbbaldez.stacktale.example.OrderException",
-    "allDeclaredMethods": true,
-    "allDeclaredFields": true
-  }
-]
