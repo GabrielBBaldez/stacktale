@@ -176,6 +176,26 @@ io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.appPackages = com.you
 `SEVERE` records become reports; lower levels feed the story (which correlates by thread,
 since JUL has no MDC). No extra dependency — JUL is in the JDK.
 
+## Ecosystem
+
+One `stacktale-core`, every entry point — add only the ones your stack uses:
+
+| Where your app logs | Module |
+|---|---|
+| **Logback** | `stacktale` — the appender ([quickstart](#plain-logback-any-framework-or-none)) |
+| **Log4j2** | `stacktale-log4j2` |
+| **java.util.logging / `System.Logger`** | `stacktale-jul` |
+| **Spring Boot** | `stacktale-spring-boot-starter` — zero-config, auto-registered |
+
+| Where the report is consumed | |
+|---|---|
+| **AI assistants (MCP)** | `stacktale-mcp` — read reports as tools in Claude Code / Cursor |
+| **Throw-site arguments** | `stacktale-agent` — an optional `-javaagent` capturing method args |
+| **IntelliJ IDEA / JetBrains** | [**stacktale-intellij**](https://github.com/GabrielBBaldez/stacktale-intellij) — a tool window over `errors-ai.log`: reports newest-first, double-click to jump to the culprit line, copy-for-AI |
+
+Every library module is Java 17+, [JPMS](#java-modules-jpms)-ready and [GraalVM-native](docs/native.md)-ready.
+On the roadmap: a **VS Code extension** (#70) and a **`stacktale` CLI** (#71).
+
 ## What gets captured
 
 | Section | What it is |
