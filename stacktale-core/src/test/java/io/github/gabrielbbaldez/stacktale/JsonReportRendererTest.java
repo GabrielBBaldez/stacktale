@@ -89,6 +89,24 @@ class JsonReportRendererTest {
     }
 
     @Test
+    void redactionMasksCompoundSecretKeysMatchingTheTextFormat() throws Exception {
+        // regression for #53: a whole-key match ("password") was masked, but a compound key
+        // ("db.password", "x-api-key") leaked its value in JSON while the text format masked it
+        Report r = new Report("cafe", 1_000_000L, "main", null, "boom", null, "com.acme.Svc",
+                Map.of("db.password", "hunter2", "x-api-key", "sk-live-abcdef", "requestId", "r-42"),
+                Map.of(), List.of(),
+                new Story(List.of(), "thread main"), "app=? | java 21 | linux", 1, 0L);
+
+        String rendered = renderer.render(r);
+        JsonNode j = parse(rendered);
+
+        assertThat(j.at("/mdc/db.password").asText()).isEqualTo("███");
+        assertThat(j.at("/mdc/x-api-key").asText()).isEqualTo("███");
+        assertThat(j.at("/mdc/requestId").asText()).isEqualTo("r-42"); // non-secret untouched
+        assertThat(rendered).doesNotContain("hunter2").doesNotContain("sk-live-abcdef");
+    }
+
+    @Test
     void secretPositionArgIsMaskedInJson() throws Exception {
         Report r = new Report("cafe", 1_000_000L, "main", null,
                 "auth token={}", new Object[]{"sk-live-abcdef"}, "com.acme.Auth",

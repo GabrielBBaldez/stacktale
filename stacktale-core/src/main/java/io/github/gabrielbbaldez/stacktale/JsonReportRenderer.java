@@ -144,8 +144,12 @@ final class JsonReportRenderer implements Renderer {
         boolean first = true;
         for (Map.Entry<String, String> e : new TreeMap<>(map).entrySet()) {
             if (!first) b.append(',');
-            // a secret-named key masks its value; otherwise the value is redacted normally
-            String v = redactor.isSecretKey(e.getKey()) ? "███" : redactor.redact(nz(e.getValue()));
+            // redact key+value together, exactly like the text renderer — so a secret-named
+            // key masks its value even when compound (db.password, x-api-key), and a
+            // secret-shaped value (email, token) is caught too — then take the value back out
+            String redacted = redactor.redact(e.getKey() + "=" + nz(e.getValue()));
+            int eq = redacted.indexOf('=');
+            String v = eq >= 0 ? redacted.substring(eq + 1) : nz(e.getValue());
             b.append(quote(e.getKey())).append(':').append(quote(v));
             first = false;
         }
