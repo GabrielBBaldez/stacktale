@@ -19,6 +19,12 @@ and every error your app logs becomes a complete, token-efficient report in
 assistant or an automated agent. It's written **alongside** your normal logs — the full
 stack trace stays exactly where it is.
 
+<p align="center">
+  <img src="docs/demo.gif" alt="A raw 31-frame Java stack trace is distilled into a compact stacktale report, pasted to an AI assistant, which pinpoints the null customer from a cache miss and writes the fix on its first reply." width="760">
+  <br>
+  <sub><b>Stack trace → stacktale report → paste to your AI → fixed.</b> One paste, no interrogation. <a href="https://gabrielbbaldez.github.io/stacktale/">See it live →</a></sub>
+</p>
+
 ## Why
 
 The Java error log format was designed in the 90s for a human with `grep`, and for that
