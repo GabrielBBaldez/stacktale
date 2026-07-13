@@ -132,7 +132,7 @@ public final class StacktaleAppender extends AbstractAppender {
         @PluginBuilderAttribute private String zone = "";
         /** 0 disables container-echo suppression. */
         @PluginBuilderAttribute private long echoSuppressionMillis = ReportPipeline.Settings.DEFAULT_ECHO_SUPPRESSION_MILLIS;
-        /** Comma-separated logger prefixes treated as container echoes (empty = defaults). */
+        /** Comma-separated logger prefixes treated as container echoes, added to the defaults. */
         @PluginBuilderAttribute private String containerLoggers = "";
         /** Also emit each report block as ONE event via logger {@code stacktale.reports}. */
         @PluginBuilderAttribute private boolean emitReportsToLogger = false;
@@ -161,9 +161,12 @@ public final class StacktaleAppender extends AbstractAppender {
                     }
                 }
             }
-            List<String> containers = containerLoggers == null || containerLoggers.isBlank()
-                    ? ReportPipeline.Settings.DEFAULT_CONTAINER_LOGGERS
-                    : csv(containerLoggers);
+            // additive, matching the Logback appender + Spring starter — a custom prefix adds
+            // to the Tomcat default rather than replacing it (else echo suppression is lost)
+            List<String> containers = new java.util.ArrayList<>(ReportPipeline.Settings.DEFAULT_CONTAINER_LOGGERS);
+            if (containerLoggers != null && !containerLoggers.isBlank()) {
+                containers.addAll(csv(containerLoggers));
+            }
             ReportPipeline.Settings settings = ReportPipeline.Settings.builder()
                     .file(file)
                     .appPackages(csv(appPackages))
