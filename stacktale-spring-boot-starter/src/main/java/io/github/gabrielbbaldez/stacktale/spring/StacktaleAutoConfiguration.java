@@ -45,7 +45,10 @@ public class StacktaleAutoConfiguration {
         }
         Logger root = ctx.getLogger(Logger.ROOT_LOGGER_NAME);
         if (root.getAppender(APPENDER_NAME) instanceof StacktaleAppender existing) {
-            return existing; // user already configured one in logback.xml — don't double up
+            // user already configured one in logback.xml — don't double up, but still route the
+            // request lines only to it; otherwise they leak to the console via root additivity (#56)
+            routeRequestLinesTo(ctx, existing);
+            return existing;
         }
         // Logback's context outlives Spring's: a previous application context (test suite,
         // DevTools restart) may have left OUR appender behind with stale configuration.
@@ -84,22 +87,29 @@ public class StacktaleAutoConfiguration {
         appender.start();
         root.addAppender(appender);
 
-        // request lines go ONLY to stacktale, never to the user's console appenders
+        routeRequestLinesTo(ctx, appender);
+        return appender;
+    }
+
+    /** Route HTTP request lines ONLY to stacktale (additivity off), never to console appenders. */
+    private static void routeRequestLinesTo(LoggerContext ctx, StacktaleAppender appender) {
         Logger requestLogger = ctx.getLogger(StacktaleRequestFilter.REQUEST_LOGGER);
         requestLogger.setAdditive(false);
         requestLogger.addAppender(appender);
-        return appender;
     }
 
     /** Detaches the auto-configured appender when the Spring context closes. */
     @Bean
     public org.springframework.beans.factory.DisposableBean stacktaleCleanup(StacktaleAppender appender) {
         return () -> {
-            if (LoggerFactory.getILoggerFactory() instanceof LoggerContext ctx
-                    && AUTO_APPENDER_NAME.equals(appender.getName())) {
-                ctx.getLogger(Logger.ROOT_LOGGER_NAME).detachAppender(appender);
+            if (LoggerFactory.getILoggerFactory() instanceof LoggerContext ctx) {
+                // the request-logger wiring is always ours — undo it either way (#56)
                 ctx.getLogger(StacktaleRequestFilter.REQUEST_LOGGER).detachAppender(appender);
-                appender.stop();
+                // but only detach + stop the appender WE created; never the user's own
+                if (AUTO_APPENDER_NAME.equals(appender.getName())) {
+                    ctx.getLogger(Logger.ROOT_LOGGER_NAME).detachAppender(appender);
+                    appender.stop();
+                }
             }
         };
     }

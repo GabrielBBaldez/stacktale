@@ -22,6 +22,9 @@ class StacktaleAutoConfigurationTest {
         Logger root = ctx.getLogger(Logger.ROOT_LOGGER_NAME);
         root.detachAppender(StacktaleAutoConfiguration.AUTO_APPENDER_NAME);
         root.detachAppender(StacktaleAutoConfiguration.APPENDER_NAME); // the manual one some tests register
+        Logger requestLogger = ctx.getLogger(StacktaleRequestFilter.REQUEST_LOGGER);
+        requestLogger.detachAndStopAllAppenders();
+        requestLogger.setAdditive(true); // reset the global logger for the next test
     }
 
     @Test
@@ -88,7 +91,13 @@ class StacktaleAutoConfigurationTest {
         manual.start();
         ctx.getLogger(Logger.ROOT_LOGGER_NAME).addAppender(manual);
 
-        runner.run(context ->
-                assertThat(context.getBean(StacktaleAppender.class)).isSameAs(manual));
+        runner.run(context -> {
+            assertThat(context.getBean(StacktaleAppender.class)).isSameAs(manual);
+            // #56: even when reusing a user-configured appender, request lines must be routed
+            // ONLY to stacktale (additivity off) — not leaked to the console via the root logger
+            Logger requestLogger = ctx.getLogger(StacktaleRequestFilter.REQUEST_LOGGER);
+            assertThat(requestLogger.isAdditive()).isFalse();
+            assertThat(requestLogger.getAppender(StacktaleAutoConfiguration.APPENDER_NAME)).isSameAs(manual);
+        });
     }
 }
