@@ -237,9 +237,13 @@ public final class ReportPipeline {
                     // storm control gates only full reports (summaries are already throttled);
                     // beyond the rate limit, distinct errors are counted, not dumped
                     StormLimiter.Outcome storm = stormLimiter.onReport();
-                    if (storm.action() == StormLimiter.Action.SUPPRESS) return;
+                    if (storm.action() == StormLimiter.Action.SUPPRESS) {
+                        deduper.rollback(fingerprint); // #51: report not written — re-arm a fresh one
+                        return;
+                    }
                     if (storm.action() == StormLimiter.Action.STORM_LINE) {
                         writer.append(renderer.stormLine(storm.suppressed(), stormLimiter.maxPerWindow()));
+                        deduper.rollback(fingerprint); // #51: this error's own report wasn't written
                         return;
                     }
                     String rendered;
@@ -262,6 +266,7 @@ public final class ReportPipeline {
                     }
                     // past this point the report is on disk: a failing shipper must not
                     // undo dedup state (that would duplicate the next occurrence's report)
+                    deduper.confirmReport(fingerprint); // #51: clears the retry flag now it's written
                     synchronized (lastReportByThread) {
                         lastReportByThread.put(threadKey(event), System.currentTimeMillis());
                     }

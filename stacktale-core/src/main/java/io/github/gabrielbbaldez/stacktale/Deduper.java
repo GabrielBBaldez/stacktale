@@ -21,6 +21,7 @@ final class Deduper {
         long lastSeen;
         long firstSeen;    // first time this fingerprint was seen this session (never reset)
         int total;         // lifetime occurrences across all windows
+        boolean reportPending; // a REPORT was decided but not yet durably written (retry it)
     }
 
     /** A repeat counter whose latest value never reached the file (burst inside the throttle). */
@@ -48,14 +49,23 @@ final class Deduper {
         s.lastSeen = now;
         if (s.total == 0) s.firstSeen = now;
         s.total++;
+        // A fresh full report: first sighting in the window, or the window rolled over.
         if (s.count == 0 || now - s.lastReport > windowMillis) {
             s.count = 1;
             s.lastWrittenCount = 1;
             s.lastReport = now;
             s.lastSummary = now;
+            s.reportPending = true;
             return new Decision(Kind.REPORT, 1, now, s.total, s.firstSeen);
         }
         s.count++;
+        // The window's report was decided but is not yet durably written — a write is in
+        // flight (concurrency), or it was storm-suppressed and not yet re-armed. Stay SILENT:
+        // never emit a SUMMARY that references a report the file may never receive (#51). The
+        // count still advances; confirmReport resumes summaries, rollback re-arms a REPORT.
+        if (s.reportPending) {
+            return new Decision(Kind.SILENT, s.count, now, s.total, s.firstSeen);
+        }
         boolean firstRepeat = s.count == 2;
         if (firstRepeat || now - s.lastSummary >= summaryThrottleMillis) {
             s.lastSummary = now;
@@ -70,6 +80,12 @@ final class Deduper {
     synchronized void confirmWritten(String fingerprint, int count) {
         Stats s = stats.get(fingerprint);
         if (s != null && count > s.lastWrittenCount) s.lastWrittenCount = count;
+    }
+
+    /** The full report for this fingerprint reached the file; stop retrying it as a REPORT. */
+    synchronized void confirmReport(String fingerprint) {
+        Stats s = stats.get(fingerprint);
+        if (s != null) s.reportPending = false;
     }
 
     /** Counters ahead of what the file shows (throttled bursts) — drained on shutdown. */
