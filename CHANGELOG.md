@@ -30,7 +30,7 @@ Production hardening and the agentic loop.
 - Container-echo suppression and burst-counter flush (from real-world dogfooding); Log4j2
   non-parameterized message types; non-English redaction keywords.
 
-[0.4.0]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.4.0
+[0.4.0]: https://github.com/stacktale/stacktale/releases/tag/v0.4.0
 
 ## [0.3.1] — 2026-07-10
 
@@ -54,7 +54,7 @@ functionally unchanged from 0.3.0; only bug fixes.)
   return JSON-RPC `-32601`.
 - **Dedup**: repeat counts are marked written only after a successful append.
 
-[0.3.1]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.3.1
+[0.3.1]: https://github.com/stacktale/stacktale/releases/tag/v0.3.1
 
 ## [0.3.0] — 2026-07-10
 
@@ -81,7 +81,7 @@ The "capture everything, everywhere" release — closes the entire original back
 - **Log4j2**: non-parameterized Message types (MapMessage & co.) render readable `log:` lines.
 - README: measured token economics — 98.3% session savings (60×), 80.6% per error.
 
-[0.3.0]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.3.0
+[0.3.0]: https://github.com/stacktale/stacktale/releases/tag/v0.3.0
 
 ## [0.2.0] — 2026-07-10
 
@@ -105,7 +105,7 @@ First release on **Maven Central**.
 - Dependency refresh via Dependabot (Logback 1.5.38, AssertJ 3.27.7, Surefire 3.5.6,
   JaCoCo 0.8.15, actions/checkout v7, setup-java v5).
 
-[0.2.0]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.2.0
+[0.2.0]: https://github.com/stacktale/stacktale/releases/tag/v0.2.0
 
 ## [0.1.0] — 2026-07-09
 
@@ -155,4 +155,4 @@ First release. Everything below is new.
   threads, real embedded-Tomcat starter test), line coverage 93%+.
 - Blind A/B on AI agents documented in the README.
 
-[0.1.0]: https://github.com/GabrielBBaldez/stacktale/releases/tag/v0.1.0
+[0.1.0]: https://github.com/stacktale/stacktale/releases/tag/v0.1.0

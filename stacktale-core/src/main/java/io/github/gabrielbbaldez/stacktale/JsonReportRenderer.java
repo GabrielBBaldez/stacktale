@@ -72,7 +72,7 @@ final class JsonReportRenderer implements Renderer {
     @Override
     public String fileHeader() {
         return "{\"type\":\"header\",\"format\":\"" + FORMAT_VERSION
-                + "\",\"docs\":\"https://github.com/GabrielBBaldez/stacktale/blob/main/docs/FORMAT.md\"}\n";
+                + "\",\"docs\":\"https://github.com/stacktale/stacktale/blob/main/docs/FORMAT.md\"}\n";
     }
 
     @Override

@@ -19,7 +19,7 @@ class StacktaleMcpServerTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final String ST_FILE = """
-            # AI-oriented error reports (format st/1, https://github.com/GabrielBBaldez/stacktale)
+            # AI-oriented error reports (format st/1, https://github.com/stacktale/stacktale)
             # header lines...
             ━━━ ERROR #aaaa1111 ━━━ 2026-07-10 10:00:00.000 thread=main ━━━
             NullPointerException: customer is null

@@ -124,7 +124,7 @@ final class ReportRenderer implements Renderer {
     @Override
     public String fileHeader() {
         return """
-                # AI-oriented error reports (format st/1, https://github.com/GabrielBBaldez/stacktale)
+                # AI-oriented error reports (format st/1, https://github.com/stacktale/stacktale)
                 # Each report is delimited by "━━━ ERROR #<id> ━━━" ... "━━━ END #<id> ━━━".
                 # Sections: headline (root cause first), at (culprit frame), log, mdc,
                 # fields (state carried by the exception's own getters/fields),

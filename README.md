@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GabrielBBaldez/stacktale/actions/workflows/ci.yml"><img src="https://github.com/GabrielBBaldez/stacktale/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/stacktale/stacktale/actions/workflows/ci.yml"><img src="https://github.com/stacktale/stacktale/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://central.sonatype.com/artifact/io.github.gabrielbbaldez/stacktale"><img src="https://img.shields.io/maven-central/v/io.github.gabrielbbaldez/stacktale" alt="Maven Central"></a>
   <img src="https://img.shields.io/badge/Java-17%2B-orange" alt="Java 17+">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0">
@@ -22,7 +22,7 @@ stack trace stays exactly where it is.
 <p align="center">
   <img src="docs/demo.gif" alt="A raw 31-frame Java stack trace is distilled into a compact stacktale report, pasted to an AI assistant, which pinpoints the null customer from a cache miss and writes the fix on its first reply." width="760">
   <br>
-  <sub><b>Stack trace → stacktale report → paste to your AI → fixed.</b> One paste, no interrogation. <a href="https://gabrielbbaldez.github.io/stacktale/">See it live →</a></sub>
+  <sub><b>Stack trace → stacktale report → paste to your AI → fixed.</b> One paste, no interrogation. <a href="https://stacktale.github.io/stacktale/">See it live →</a></sub>
 </p>
 
 ## Why
@@ -197,7 +197,7 @@ One `stacktale-core`, every entry point — add only the ones your stack uses:
 |---|---|
 | **AI assistants (MCP)** | `stacktale-mcp` — read reports as tools in Claude Code / Cursor |
 | **Throw-site arguments** | `stacktale-agent` — an optional `-javaagent` capturing method args |
-| **IntelliJ IDEA / JetBrains** | [**stacktale-intellij**](https://github.com/GabrielBBaldez/stacktale-intellij) — a tool window over `errors-ai.log`: reports newest-first, double-click to jump to the culprit line, copy-for-AI |
+| **IntelliJ IDEA / JetBrains** | [**stacktale-intellij**](https://github.com/stacktale/stacktale-intellij) — a tool window over `errors-ai.log`: reports newest-first, double-click to jump to the culprit line, copy-for-AI |
 
 Every library module is Java 17+, [JPMS](#java-modules-jpms)-ready and [GraalVM-native](docs/native.md)-ready.
 On the roadmap: a **VS Code extension** (#70) and a **`stacktale` CLI** (#71).
@@ -439,10 +439,10 @@ it degrades to empty (never a crash). Full details and the escape hatch:
 The original roadmap (Central, Log4j2, starter, agent, MCP, real-world validation) has
 shipped. What's next lives in the milestones:
 
-- **[0.4.0](https://github.com/GabrielBBaldez/stacktale/milestone/1)** — production
+- **[0.4.0](https://github.com/stacktale/stacktale/milestone/1)** — production
   hardening and the agentic loop: formal `st/1` spec, error-storm rate limiting, MCP
   push notifications, agent filters, compatibility matrix, one-click releases.
-- **[1.0.0](https://github.com/GabrielBBaldez/stacktale/milestone/2)** — maturity:
+- **[1.0.0](https://github.com/stacktale/stacktale/milestone/2)** — maturity:
   frozen format spec, mutation-tested, soak-tested, SBOM + provenance, receiver-state
   capture exploration.
 

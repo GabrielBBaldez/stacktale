@@ -38,7 +38,7 @@ self-describing by design — an AI that opens the file with no prior knowledge 
 format from it.
 
 ```
-# AI-oriented error reports (format st/1, https://github.com/GabrielBBaldez/stacktale)
+# AI-oriented error reports (format st/1, https://github.com/stacktale/stacktale)
 # Each report is delimited by "━━━ ERROR #<id> ━━━" ... "━━━ END #<id> ━━━".
 # ...
 ```

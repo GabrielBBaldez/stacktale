@@ -58,7 +58,7 @@ docs), token-efficient (no JSON punctuation tax, no repeated keys), stable.
 ### 3.1 File header (written once per file)
 
 ```
-# errors-ai.log — AI-oriented error reports (format st/1, https://github.com/GabrielBBaldez/stacktale)
+# errors-ai.log — AI-oriented error reports (format st/1, https://github.com/stacktale/stacktale)
 # Each report is delimited by "━━━ ERROR #<id> ━━━" ... "━━━ END #<id> ━━━".
 # Sections: headline, at, log, mdc, story (events leading up to and including the error, oldest first),
 # stack (distilled; framework frames collapsed), env. "← YOUR CODE" marks app frames.
@@ -241,7 +241,7 @@ extends it — the format and guarantees below are the source of truth in code
 
 ## 10. Coordinates & licensing
 
-- GitHub: `GabrielBBaldez/stacktale` (public)
+- GitHub: `stacktale/stacktale` (public)
 - Maven: `io.github.gabrielbbaldez:stacktale` (Central publication in Phase 2)
 - Package: `io.github.gabrielbbaldez.stacktale`
 - License: Apache-2.0

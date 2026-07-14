@@ -11,7 +11,7 @@
 
   <name>stacktale-parent</name>
   <description>Stack traces that tell the tale — build parent.</description>
-  <url>https://github.com/GabrielBBaldez/stacktale</url>
+  <url>https://github.com/stacktale/stacktale</url>
 
   <licenses>
     <license>
@@ -30,9 +30,9 @@
   </developers>
 
   <scm>
-    <connection>scm:git:https://github.com/GabrielBBaldez/stacktale.git</connection>
-    <developerConnection>scm:git:git@github.com:GabrielBBaldez/stacktale.git</developerConnection>
-    <url>https://github.com/GabrielBBaldez/stacktale</url>
+    <connection>scm:git:https://github.com/stacktale/stacktale.git</connection>
+    <developerConnection>scm:git:git@github.com:stacktale/stacktale.git</developerConnection>
+    <url>https://github.com/stacktale/stacktale</url>
     <tag>HEAD</tag>
   </scm>
 
