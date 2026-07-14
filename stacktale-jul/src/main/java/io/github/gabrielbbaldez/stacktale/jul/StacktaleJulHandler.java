@@ -3,6 +3,7 @@ package io.github.gabrielbbaldez.stacktale.jul;
 import io.github.gabrielbbaldez.stacktale.Csv;
 import io.github.gabrielbbaldez.stacktale.LogEventData;
 import io.github.gabrielbbaldez.stacktale.ReportPipeline;
+import io.github.gabrielbbaldez.stacktale.UncaughtHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +55,7 @@ public final class StacktaleJulHandler extends Handler {
 
     /** Reads configuration from {@code logging.properties} — the JUL-native path. */
     public StacktaleJulHandler() {
-        this(settingsFromLogManager());
+        this(settingsFromLogManager(), installUncaughtHandlerFromLogManager());
         String level = LogManager.getLogManager().getProperty(getClass().getName() + ".level");
         if (level != null && !level.isBlank()) {
             try {
@@ -66,7 +67,24 @@ public final class StacktaleJulHandler extends Handler {
     }
 
     public StacktaleJulHandler(ReportPipeline.Settings settings) {
+        this(settings, true); // install the uncaught handler by default, like the other adapters
+    }
+
+    public StacktaleJulHandler(ReportPipeline.Settings settings, boolean installUncaughtHandler) {
         this.pipeline = ReportPipeline.create(settings, host());
+        // The JVM sends uncaught exceptions to stderr, never through JUL — so without this a
+        // thread that dies without a log.error() produces no report (#55). Route them back in
+        // via UNCAUGHT_LOGGER, which propagates to this handler on the (parent) root logger.
+        if (installUncaughtHandler && pipeline.isActive()) {
+            UncaughtHandler.install((message, thrown) ->
+                    Logger.getLogger(UncaughtHandler.UNCAUGHT_LOGGER).log(Level.SEVERE, message, thrown));
+        }
+    }
+
+    private static boolean installUncaughtHandlerFromLogManager() {
+        String v = LogManager.getLogManager().getProperty(
+                StacktaleJulHandler.class.getName() + ".installUncaughtHandler");
+        return v == null || Boolean.parseBoolean(v.trim());
     }
 
     @Override

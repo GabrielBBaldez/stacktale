@@ -1,6 +1,7 @@
 package io.github.gabrielbbaldez.stacktale.jul;
 
 import io.github.gabrielbbaldez.stacktale.ReportPipeline;
+import io.github.gabrielbbaldez.stacktale.UncaughtHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -20,7 +21,7 @@ class JulHandlerIntegrationTest {
 
     private StacktaleJulHandler attach(String loggerName, Path file, String... appPackages) {
         StacktaleJulHandler handler = new StacktaleJulHandler(ReportPipeline.Settings.builder()
-                .file(file.toString()).appPackages(List.of(appPackages)).build());
+                .file(file.toString()).appPackages(List.of(appPackages)).build(), false); // no global handler in these unit tests
         handler.setLevel(Level.ALL);
         Logger logger = Logger.getLogger(loggerName);
         logger.setUseParentHandlers(false); // isolate from console/root
@@ -77,5 +78,35 @@ class JulHandlerIntegrationTest {
         // no error → no report (the file may not even be created, which is fine)
         String content = Files.exists(file) ? Files.readString(file) : "";
         assertThat(content).doesNotContain(REPORT_START);
+    }
+
+    @Test
+    void installsTheUncaughtExceptionHandlerByDefault(@TempDir Path dir) throws Exception {
+        // #55: the JUL adapter now installs UncaughtHandler like Logback/Log4j2, so a thread
+        // that dies without a log.error() still produces a report.
+        Thread.UncaughtExceptionHandler original = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(null);
+        try {
+            StacktaleJulHandler handler = new StacktaleJulHandler(
+                    ReportPipeline.Settings.builder().file(dir.resolve("errors-ai.log").toString()).build());
+            assertThat(Thread.getDefaultUncaughtExceptionHandler()).isInstanceOf(UncaughtHandler.class);
+            handler.close();
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(original);
+        }
+    }
+
+    @Test
+    void canOptOutOfTheUncaughtExceptionHandler(@TempDir Path dir) throws Exception {
+        Thread.UncaughtExceptionHandler original = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(null);
+        try {
+            StacktaleJulHandler handler = new StacktaleJulHandler(
+                    ReportPipeline.Settings.builder().file(dir.resolve("errors-ai.log").toString()).build(), false);
+            assertThat(Thread.getDefaultUncaughtExceptionHandler()).isNull();
+            handler.close();
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(original);
+        }
     }
 }
