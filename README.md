@@ -176,7 +176,21 @@ by default — with no SLF4J bridge:
 ```properties
 # logging.properties
 handlers = io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler
+
+# All keys use the handler's fully-qualified class name as prefix.
+# Only the properties below are read; anything else is ignored.
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.file = errors-ai.log
 io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.appPackages = com.your.app
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.format = text
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.storySize = 15
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.storyWindowSeconds = 60
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.dedupWindowSeconds = 300
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.maxFileSizeMb = 5
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.maxBackups = 1
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.maxReportsPerMinute = 0
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.redactionEnabled = true
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.redactionCorrelation = false
+io.github.gabrielbbaldez.stacktale.jul.StacktaleJulHandler.redactPatterns = (password|token)=.*;;secret=\w+
 ```
 
 `SEVERE` records become reports; lower levels feed the story (which correlates by thread,
@@ -344,17 +358,25 @@ Everything is optional — as appender properties in `logback.xml`, or `stacktal
 | `reportErrorsWithoutThrowable` | `true` | `log.error(...)` without exception still reports |
 | `captureExceptionFields` | `true` | Read exception getters into `fields:` |
 | `redactionEnabled` | `true` | Mask secrets/PII in report content |
-| `redactPattern` (repeatable) | — | Extra redaction regexes |
+| `redactPattern` / `redactPatterns` | — | Extra redaction regexes (see note below) |
 | `redactionCorrelation` | `false` | Tag masked values with a stable keyed token (`███(a1b2)`) so an AI can see the same secret recurring |
 | `correlationMdcKeys` | `traceId,correlationId,requestId` | MDC keys that group the story |
 | `zone` | system | Timezone for report timestamps |
 | `echoSuppressionMillis` | `2000` | Skip container re-logs of a failure this thread just reported (0 = off) |
-| `containerLogger` (repeatable) | Tomcat's | Extra logger prefixes treated as container echoes |
+| `containerLogger` / `containerLoggers` | Tomcat's | Extra logger prefixes treated as container echoes (see note below) |
 | `emitReportsToLogger` | `false` | Also emit each block as ONE event via logger `stacktale.reports` |
 | `maxReportsPerMinute` | `0` (unlimited) | Cap full reports/min; a cascade of distinct errors becomes a `storm:` line instead of flooding the file |
 | `format` | `text` | `text` (densest for an LLM to read) or `json` ([st-json/1](docs/FORMAT.md) NDJSON, for parsers/pipelines) |
-| `echoSuppressionMillis` | `2000` | Suppress container re-logs of a failure this thread just reported (0 = off) |
+| `stacktale.enabled` *(starter)* | `true` | Set to `false` to disable the appender, request filter, and reactive config entirely |
 | `requestLogging` *(starter)* | `true` | HTTP request lines into the story |
+
+**Redaction patterns by framework.** Logback: repeatable `<redactPattern>` elements in
+`logback.xml`. Log4j2/JUL: a single string with patterns separated by `;;` (regexes may
+contain commas, so commas are not the delimiter).
+
+**Container loggers by framework.** Logback: repeatable `<containerLogger>` elements.
+Log4j2: a comma-separated `containerLoggers` attribute. JUL: uses the built-in default
+(`org.apache.catalina.core.ContainerBase`) and does not currently support custom values.
 
 The **agent** takes `-javaagent:stacktale-agent.jar=packages=com.your.app` plus optional
 `excludes=`, `maxFrames=`, `maxValueLength=`, and `renderToString=false` (privacy mode:
