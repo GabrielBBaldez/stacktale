@@ -112,6 +112,30 @@ servlet filter that opens every story with the HTTP request line (`GET /orders/8
 through a stacktale-only logger — **your console never sees those lines**. Tune anything
 via `stacktale.*` properties in `application.yml`.
 
+### Kotlin
+
+stacktale works from Kotlin with zero changes — it's a Logback/SLF4J appender, so any
+JVM language that logs through SLF4J gets reports automatically. Setup (`logback.xml`,
+the Spring Boot starter, Log4j2, JUL) is **identical to Java** — no Kotlin-specific
+configuration needed.
+
+```kotlin
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger("com.example.OrderService")
+
+fun confirmOrder(orderId: Long, customerId: Long) {
+    log.info("Confirming order {} for customer {}", orderId, customerId)
+    val customer = customerCache.get(customerId)
+        ?: throw OrderException("customer $customerId not found for order $orderId")
+    // ... business logic
+}
+```
+
+When `confirmOrder` throws, stacktale produces the same AI-ready report shown above —
+complete with the story, MDC, and distilled stack — regardless of whether the code is
+written in Kotlin or Java.
+
 ### Plain Logback (any framework, or none)
 
 ```xml
