@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -64,8 +65,9 @@ class StacktaleMcpServerTest {
                 "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}");
         assertThat(r[0].at("/result/serverInfo/name").asText()).isEqualTo("stacktale");
         assertThat(r[0].at("/result/capabilities/resources/subscribe").asBoolean()).isTrue();
-        assertThat(r[1].at("/result/tools")).hasSize(3);
+        assertThat(r[1].at("/result/tools")).hasSize(4);
         assertThat(r[1].at("/result/tools/0/name").asText()).isEqualTo("list_errors");
+        assertThat(r[1].at("/result/tools/3/name").asText()).isEqualTo("find_similar_errors");
     }
 
     @Test
@@ -199,5 +201,25 @@ class StacktaleMcpServerTest {
                         .getBytes(StandardCharsets.UTF_8)), out);
         JsonNode r = JSON.readTree(out.toString(StandardCharsets.UTF_8).trim());
         assertThat(r.at("/result/content/0/text").asText()).contains("ancient failure");
+    }
+
+    @Test
+    void findSimilarRanksByExceptionTypeAndNormalizedMessage() {
+        // #67: same root-cause type + digit-normalized message ranks first; unrelated errors
+        // score 0 and drop out entirely.
+        List<StReportFile.StReport> reports = List.of(
+                report("aaa11111", "NullPointerException: customer is null"),
+                report("bbb22222", "NullPointerException: Cannot invoke \"Customer.tier()\" because \"customer\" is null"),
+                report("ccc33333", "IllegalStateException: payment gateway refused"),
+                report("ddd44444", "SQLException: connection timed out"));
+
+        List<StReportFile.StReport> hits = StacktaleMcpServer.rank(
+                "NullPointerException: customer 8842 is null", reports, 5);
+
+        assertThat(hits).extracting(r -> r.id()).containsExactly("aaa11111", "bbb22222");
+    }
+
+    private static StReportFile.StReport report(String id, String headline) {
+        return new StReportFile.StReport(id, "2026-07-14 10:00:00.000", headline, 1, "block");
     }
 }

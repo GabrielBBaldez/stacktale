@@ -16,7 +16,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A tiny read-only MCP server (JSON-RPC 2.0 over stdio) that lets AI assistants query
@@ -232,6 +234,9 @@ public final class StacktaleMcpServer {
         tools.add(tool("errors_since",
                 "Full report blocks with timestamp >= the given moment (format: yyyy-MM-dd HH:mm:ss).",
                 "{\"type\":\"object\",\"properties\":{\"since\":{\"type\":\"string\",\"description\":\"e.g. 2026-07-10 11:00:00\"}},\"required\":[\"since\"]}"));
+        tools.add(tool("find_similar_errors",
+                "Find past reports similar to an exception headline or stack snippet, ranked by root-cause type + digit-normalized message. Answers \"have we seen this before?\".",
+                "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"an exception headline or stack snippet, e.g. 'NullPointerException: customer is null'\"}},\"required\":[\"query\"]}"));
         return result;
     }
 
@@ -254,6 +259,7 @@ public final class StacktaleMcpServer {
             case "list_errors" -> listErrors(args.path("limit").asInt(20));
             case "get_report" -> getReport(args.path("id").asText());
             case "errors_since" -> errorsSince(args.path("since").asText());
+            case "find_similar_errors" -> findSimilar(args.path("query").asText());
             default -> throw new IllegalArgumentException("unknown tool: " + name);
         };
         ObjectNode result = JSON.createObjectNode();
@@ -295,5 +301,68 @@ public final class StacktaleMcpServer {
         StringBuilder sb = new StringBuilder();
         matching.forEach(r -> sb.append(r.block()).append('\n'));
         return sb.toString();
+    }
+
+    private String findSimilar(String query) throws IOException {
+        if (query == null || query.isBlank()) return "Provide an exception headline or stack snippet to match against.";
+        List<StReport> ranked = rank(query, reports.read(), 5);
+        if (ranked.isEmpty()) return "No similar reports found.";
+        StringBuilder sb = new StringBuilder("Most similar reports first:\n");
+        ranked.forEach(r -> sb.append('#').append(r.id())
+                .append("  ").append(r.timestamp())
+                .append(r.repeats() > 1 ? "  (×" + r.repeats() + ")" : "")
+                .append("  ").append(r.headline()).append('\n'));
+        sb.append("\nUse get_report <id> for the full block.");
+        return sb.toString();
+    }
+
+    /** Reports ranked by similarity to {@code query} (an exception headline or stack snippet). */
+    static List<StReport> rank(String query, List<StReport> reports, int limit) {
+        Sig q = Sig.of(query);
+        return reports.stream()
+                .map(r -> new Scored(r, score(q, Sig.of(r.headline()))))
+                .filter(sc -> sc.score() > 0)
+                .sorted(Comparator.comparingDouble(Scored::score).reversed())
+                .limit(limit)
+                .map(Scored::report)
+                .toList();
+    }
+
+    private record Scored(StReport report, double score) {}
+
+    /** An error's similarity signature: the exception type + its digit-normalized message words. */
+    private record Sig(String type, Set<String> words) {
+        static Sig of(String headlineOrQuery) {
+            String line = headlineOrQuery == null ? "" : headlineOrQuery.strip();
+            int nl = line.indexOf('\n');
+            if (nl >= 0) line = line.substring(0, nl).strip();          // first line of a snippet
+            String type = "";
+            String message = line;
+            int colon = line.indexOf(':');
+            if (colon > 0 && line.substring(0, colon).matches("[\\w.$]+")) {
+                String head = line.substring(0, colon);
+                type = head.substring(head.lastIndexOf('.') + 1);       // simple exception name
+                message = line.substring(colon + 1);
+            }
+            Set<String> words = new LinkedHashSet<>();
+            for (String w : message.toLowerCase().replaceAll("\\d+", "0").split("[^a-z0]+")) {
+                if (w.length() > 2) words.add(w);                       // drop very short tokens
+            }
+            return new Sig(type, words);
+        }
+    }
+
+    /** 0 = nothing shared; higher = more similar (same type + overlapping normalized message). */
+    private static double score(Sig q, Sig r) {
+        double s = 0;
+        if (!q.type().isEmpty() && q.type().equalsIgnoreCase(r.type())) s += 3;
+        if (!q.words().isEmpty() && !r.words().isEmpty()) {
+            Set<String> shared = new LinkedHashSet<>(q.words());
+            shared.retainAll(r.words());
+            Set<String> union = new LinkedHashSet<>(q.words());
+            union.addAll(r.words());
+            s += 3.0 * shared.size() / union.size();                    // weighted Jaccard
+        }
+        return s;
     }
 }

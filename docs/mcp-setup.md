@@ -1,8 +1,8 @@
 # Using the stacktale MCP server
 
 `stacktale-mcp` lets an AI assistant read your app's error reports as tools — `list_errors`,
-`get_report`, `errors_since` — and, with a subscription, be **notified the moment a new
-error lands** instead of polling. It's a tiny read-only server that speaks
+`get_report`, `errors_since`, `find_similar_errors` — and, with a subscription, be **notified
+the moment a new error lands** instead of polling. It's a tiny read-only server that speaks
 [MCP](https://modelcontextprotocol.io) over stdio. No network, no writes.
 
 ## Fastest path (2 minutes)
@@ -129,6 +129,7 @@ Once wired up, ask your assistant:
 > *What errors has the app had recently?* — it calls `list_errors`.
 > *Show me the full report for #c73cf755* — it calls `get_report`.
 > *What broke since 11am?* — it calls `errors_since`.
+> *Have we seen this NPE before?* — it calls `find_similar_errors`.
 
 ## Troubleshooting
 
