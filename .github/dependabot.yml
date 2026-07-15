@@ -11,6 +11,10 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # Spring Boot 4 is a deliberate major migration, not a routine bump — don't nag.
+      - dependency-name: "org.springframework.boot:*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
