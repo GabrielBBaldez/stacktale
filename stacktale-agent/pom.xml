@@ -101,7 +101,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.6.0</version>
+        <version>3.6.2</version>
         <!-- byte-buddy 1.18 ships Java 24 (class-file major 68) multi-release classes;
              the shade-plugin's bundled ASM can't read them ("Unsupported class file
              major version 68"). Pin ASM to a release that understands Java 24 so
@@ -110,12 +110,12 @@
           <dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
-            <version>9.8</version>
+            <version>9.10.1</version>
           </dependency>
           <dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm-commons</artifactId>
-            <version>9.8</version>
+            <version>9.10.1</version>
           </dependency>
         </dependencies>
         <executions>
