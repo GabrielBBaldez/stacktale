@@ -456,6 +456,57 @@ reflects over *your* exception types — register them and it keeps working; lea
 it degrades to empty (never a crash). Full details and the escape hatch:
 [docs/native.md](docs/native.md).
 
+## Frequently Asked Questions (FAQ)
+
+### Does stacktale slow down an application?
+
+For normal application logging, JMH benchmarks measure about 137 ns per Logback INFO event with stacktale enabled 
+(roughly 110 ns above the baseline logger). Repeated errors that are deduplicated cost around 3.9 µs each.
+writing a full report takes milliseconds and only happens when an error occurs.
+
+### How does stacktale protect secrets and personally identifiable information (PII)?
+
+Redaction is enabled by default. Stacktale automatically masks common sensitive data such as JWTs, bearer tokens, 
+password values, long hex secrets, email addresses, and Luhn-valid credit card numbers. You can also configure 
+additional redactPattern or redactPatterns rules, or disable captureExceptionFields if desired.
+
+### Does stacktale replace my existing logs?
+
+No. Stacktale writes AI-ready reports to a separate errors-ai.log file alongside your existing logs. 
+Your normal console and log output, including full stack traces, aren't affected.
+
+### Which logging frameworks are supported?
+
+Stacktale supports:
+- Logback
+- Log4j2
+- java.util.logging (JUL) and System.Logger
+- Spring Boot, via a zero-configuration starter
+
+All implementations share the same core reporting pipeline.
+
+### How does an AI read the reports?
+
+You can point your AI assistant at errors-ai.log or use the stacktale-mcp server so AI assistants can query 
+reports as tools instead of reading the file directly.
+
+### Does stacktale send error data to external services?
+
+No. Stacktale writes reports to a local file and does not perform any network communication or phone-home behavior. 
+Reports remain within the same trust boundary as the application's existing logs.
+
+### What happens if stacktale encounters an internal error?
+
+Stacktale is designed to fail safely. Internal failures, including invalid configuration during startup, degrade the 
+library to a no-op rather than affecting application startup or runtime behavior.
+
+### What information is included in a stacktale report?
+
+Each report combines the error with the context captured at the time it occurred. Depending on configuration, 
+it includes the root cause, culprit frame, log message and arguments, MDC values, exception fields, recent events ("story"), 
+a distilled stack trace, environment details, and, with the optional stacktale-agent, method arguments at the throw site.
+Reports also record repeated errors and application restarts.
+
 ## Roadmap
 
 The original roadmap (Central, Log4j2, starter, agent, MCP, real-world validation) has
