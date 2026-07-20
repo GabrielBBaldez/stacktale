@@ -2,6 +2,12 @@
 
 Thanks for stopping by the campfire. 🔥
 
+By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+New here? The [`good first issue`](https://github.com/stacktale/stacktale/labels/good%20first%20issue)
+label marks issues written to be picked up cold — each one names the files to touch and how
+to verify. Comment on the issue to claim it.
+
 ## Build & test
 
 ```bash
