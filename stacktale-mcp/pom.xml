@@ -58,6 +58,8 @@
                   <mainClass>io.github.gabrielbbaldez.stacktale.mcp.StacktaleMcpServer</mainClass>
                   <manifestEntries>
                     <Automatic-Module-Name>io.github.gabrielbbaldez.stacktale.mcp</Automatic-Module-Name>
+                    <!-- so serverInfo.version reports the real version, not the "dev" fallback -->
+                    <Implementation-Version>${project.version}</Implementation-Version>
                   </manifestEntries>
                 </transformer>
               </transformers>
