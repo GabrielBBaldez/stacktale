@@ -54,8 +54,9 @@ caps and the floor never rises.
 |---|---|---|---|---|---|
 | 20 s | 45,150 | 8 | 7.3 MB | 7.3 MB | 1.00 |
 | 540 s (9 min) | 1,208,850 | 227 | 7.4 MB | 7.4 MB | 1.00 |
+| 3600 s (1 h) | 8,013,750 | 1,523 | 7.4 MB | 7.4 MB | 1.00 |
 
-Over 1.2 million events — the dedup LRU alone cycling through ~1.2M distinct fingerprints
-(evicting >99.9% of them) and the file rotating dozens of times — the live set never moved
-off ~7.4 MB. A ≥1 h run is available via the command above and reproduces the same flat
-line.
+Over a full hour and **8 million events** — the dedup LRU alone cycling through ~8M distinct
+fingerprints (evicting >99.99% of them), correlation and thread-name maps churning the same
+way, and the file rotating hundreds of times — the live set never moved off ~7.4 MB. The
+heap is flat; the bounded state is bounded in practice, not just by design.
