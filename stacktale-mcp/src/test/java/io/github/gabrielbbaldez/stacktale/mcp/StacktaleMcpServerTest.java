@@ -65,6 +65,7 @@ class StacktaleMcpServerTest {
                 "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}");
         assertThat(r[0].at("/result/serverInfo/name").asText()).isEqualTo("stacktale");
         assertThat(r[0].at("/result/capabilities/resources/subscribe").asBoolean()).isTrue();
+        assertThat(r[0].at("/result/capabilities/prompts").isObject()).isTrue();
         assertThat(r[1].at("/result/tools")).hasSize(6);
         assertThat(r[1].at("/result/tools/0/name").asText()).isEqualTo("list_errors");
         assertThat(r[1].at("/result/tools/3/name").asText()).isEqualTo("find_similar_errors");
@@ -156,6 +157,18 @@ class StacktaleMcpServerTest {
         JsonNode[] fallback = roundTrip(
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}");
         assertThat(fallback[0].at("/result/protocolVersion").asText()).isEqualTo("2025-06-18");
+    }
+
+    @Test
+    void listsAndGetsPrompts() throws Exception {
+        JsonNode[] r = roundTrip(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"prompts/list\",\"params\":{}}",
+                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"prompts/get\",\"params\":{\"name\":\"fix_loop\"}}");
+        assertThat(r[0].at("/result/prompts")).hasSize(2);
+        assertThat(r[0].at("/result/prompts/0/name").asText()).isEqualTo("fix_loop");
+        JsonNode message = r[1].at("/result/messages/0");
+        assertThat(message.at("/role").asText()).isEqualTo("user");
+        assertThat(message.at("/content/text").asText()).contains("errors_since_last_check");
     }
 
     @Test

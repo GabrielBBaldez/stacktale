@@ -135,6 +135,8 @@ public final class StacktaleMcpServer {
             case "resources/read" -> resourcesRead(params);
             case "resources/subscribe" -> resourcesSubscribe();
             case "resources/unsubscribe" -> resourcesUnsubscribe();
+            case "prompts/list" -> promptsList();
+            case "prompts/get" -> promptsGet(params);
             case "ping" -> JSON.createObjectNode();
             default -> throw new UnknownMethodException("unknown method: " + method);
         };
@@ -149,6 +151,8 @@ public final class StacktaleMcpServer {
         result.put("protocolVersion", requested.isBlank() ? PROTOCOL_VERSION : requested);
         ObjectNode capabilities = result.putObject("capabilities");
         capabilities.putObject("tools");
+        // prompts: clients surface these as slash-commands ("run the fix-loop") natively
+        capabilities.putObject("prompts").put("listChanged", false);
         // resources with subscribe: the AI is TOLD when a new error lands, it doesn't poll
         ObjectNode res = capabilities.putObject("resources");
         res.put("subscribe", true);
@@ -239,6 +243,51 @@ public final class StacktaleMcpServer {
         note.put("method", "notifications/resources/updated");
         note.putObject("params").put("uri", RESOURCE_URI);
         send(note);
+    }
+
+    // Kept in sync with the "fix-loop" section of docs/mcp-setup.md.
+    private static final String FIX_LOOP_PROMPT =
+            "Use the stacktale MCP server as a fix loop. Call errors_since_last_check to see the "
+            + "errors currently on file. Make a fix, then re-run the app or tests. Call "
+            + "errors_since_last_check again and address whatever comes back as new or still "
+            + "occurring (use get_report <id> for the full block). Repeat until it reports "
+            + "\"No new errors\". If I paste a raw stack trace, call match_report first to pull the "
+            + "captured report for it.";
+
+    private static final String EXPLAIN_LATEST_PROMPT =
+            "Call list_errors to find the most recent stacktale error, get_report its id, and explain "
+            + "the root cause using the report's story, fields and distilled stack — then propose a "
+            + "concrete fix.";
+
+    private JsonNode promptsList() {
+        ObjectNode result = JSON.createObjectNode();
+        ArrayNode prompts = result.putArray("prompts");
+        prompt(prompts, "fix_loop", "Fix errors in a loop with stacktale until the app runs clean.");
+        prompt(prompts, "explain_latest_error", "Explain stacktale's most recent error and propose a fix.");
+        return result;
+    }
+
+    private void prompt(ArrayNode prompts, String name, String description) {
+        ObjectNode p = prompts.addObject();
+        p.put("name", name);
+        p.put("description", description);
+        p.putArray("arguments"); // no arguments — these are ready-to-run
+    }
+
+    private JsonNode promptsGet(JsonNode params) {
+        String name = params.path("name").asText();
+        String text = switch (name) {
+            case "fix_loop" -> FIX_LOOP_PROMPT;
+            case "explain_latest_error" -> EXPLAIN_LATEST_PROMPT;
+            default -> throw new IllegalArgumentException("unknown prompt: " + name);
+        };
+        ObjectNode result = JSON.createObjectNode();
+        ObjectNode message = result.putArray("messages").addObject();
+        message.put("role", "user");
+        ObjectNode content = message.putObject("content");
+        content.put("type", "text");
+        content.put("text", text);
+        return result;
     }
 
     private JsonNode toolsList() {
