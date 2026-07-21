@@ -65,9 +65,57 @@ class StacktaleMcpServerTest {
                 "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}");
         assertThat(r[0].at("/result/serverInfo/name").asText()).isEqualTo("stacktale");
         assertThat(r[0].at("/result/capabilities/resources/subscribe").asBoolean()).isTrue();
-        assertThat(r[1].at("/result/tools")).hasSize(4);
+        assertThat(r[1].at("/result/tools")).hasSize(5);
         assertThat(r[1].at("/result/tools/0/name").asText()).isEqualTo("list_errors");
         assertThat(r[1].at("/result/tools/3/name").asText()).isEqualTo("find_similar_errors");
+        assertThat(r[1].at("/result/tools/4/name").asText()).isEqualTo("errors_since_last_check");
+    }
+
+    private static final String NEW_BLOCK = """
+            ━━━ ERROR #cccc3333 ━━━ 2026-07-10 12:00:00.000 thread=main ━━━
+            IllegalArgumentException: bad input
+            ━━━ END #cccc3333 ━━━
+            """;
+
+    // One fix-loop check on a persistent server instance; the cursor lives on the instance,
+    // so calling serve() again (a fresh stdio "turn") keeps it while the file changes between.
+    private static String loopCheck(StacktaleMcpServer server, int id, boolean reset) throws Exception {
+        String args = reset ? "{\"reset\":true}" : "{}";
+        String req = "{\"jsonrpc\":\"2.0\",\"id\":" + id
+                + ",\"method\":\"tools/call\",\"params\":{\"name\":\"errors_since_last_check\",\"arguments\":" + args + "}}\n";
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        server.serve(new ByteArrayInputStream(req.getBytes(StandardCharsets.UTF_8)), out);
+        return JSON.readTree(out.toString(StandardCharsets.UTF_8).trim()).at("/result/content/0/text").asText();
+    }
+
+    @Test
+    void fixLoopReportsNewRecurringAndClean(@TempDir Path dir) throws Exception {
+        Path f = dir.resolve("errors-ai.log");
+        Files.writeString(f, ST_FILE, StandardCharsets.UTF_8); // #aaaa1111 (×4) and #bbbb2222
+        StacktaleMcpServer server = new StacktaleMcpServer(f);
+
+        // first call baselines and shows what's already there
+        assertThat(loopCheck(server, 1, false))
+                .contains("currently on file").contains("aaaa1111").contains("bbbb2222");
+
+        // nothing changed → the loop's clean signal
+        assertThat(loopCheck(server, 2, false)).contains("No new errors");
+
+        // a brand-new error appears
+        Files.writeString(f, ST_FILE + NEW_BLOCK, StandardCharsets.UTF_8);
+        String afterNew = loopCheck(server, 3, false);
+        assertThat(afterNew).contains("new").contains("cccc3333");
+        assertThat(afterNew).doesNotContain("still occurring");
+
+        // an already-seen error recurs (a repeated line lifts #aaaa1111 above its baseline count)
+        Files.writeString(f, ST_FILE + NEW_BLOCK
+                + "━ #aaaa1111 repeated 9× (last 10:00:09.000) ━\n", StandardCharsets.UTF_8);
+        String afterRecur = loopCheck(server, 4, false);
+        assertThat(afterRecur).contains("still occurring").contains("aaaa1111");
+        assertThat(afterRecur).doesNotContain("cccc3333"); // cccc3333 was already reported, not new again
+
+        // reset re-baselines: the current file becomes the new starting point
+        assertThat(loopCheck(server, 5, true)).contains("currently on file");
     }
 
     @Test

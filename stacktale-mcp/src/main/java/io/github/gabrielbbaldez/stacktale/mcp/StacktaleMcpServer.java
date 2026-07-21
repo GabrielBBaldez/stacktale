@@ -15,9 +15,12 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -66,6 +69,11 @@ public final class StacktaleMcpServer {
     private final Object writeLock = new Object();
     private volatile boolean subscribed;
     private Thread watcherThread;
+
+    // Per-session cursor for the fix-loop tool: report id -> highest occurrence count already
+    // shown to the agent. Unseen id = new error; a higher count = the same error recurred.
+    private final Map<String, Integer> seenRepeats = new HashMap<>();
+    private boolean baselineTaken;
 
     void serve(InputStream in, OutputStream out) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
@@ -248,6 +256,9 @@ public final class StacktaleMcpServer {
         tools.add(tool("find_similar_errors",
                 "Find past reports similar to an exception headline or stack snippet, ranked by root-cause type + digit-normalized message. Answers \"have we seen this before?\".",
                 "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"an exception headline or stack snippet, e.g. 'NullPointerException: customer is null'\"}},\"required\":[\"query\"]}"));
+        tools.add(tool("errors_since_last_check",
+                "The fix-loop primitive. First call shows the errors currently on file; after you re-run the app/tests, it reports what's 🆕 new or 🔁 still occurring since your last call — or '✓ No new errors' when it's clean. Call it each round of a fix→run→check loop until clean. Optional reset re-baselines.",
+                "{\"type\":\"object\",\"properties\":{\"reset\":{\"type\":\"boolean\",\"description\":\"forget what was already reported and re-baseline from the current file\"}}}"));
         return result;
     }
 
@@ -271,6 +282,7 @@ public final class StacktaleMcpServer {
             case "get_report" -> getReport(args.path("id").asText());
             case "errors_since" -> errorsSince(args.path("since").asText());
             case "find_similar_errors" -> findSimilar(args.path("query").asText());
+            case "errors_since_last_check" -> errorsSinceLastCheck(args.path("reset").asBoolean(false));
             default -> throw new IllegalArgumentException("unknown tool: " + name);
         };
         ObjectNode result = JSON.createObjectNode();
@@ -312,6 +324,60 @@ public final class StacktaleMcpServer {
         StringBuilder sb = new StringBuilder();
         matching.forEach(r -> sb.append(r.block()).append('\n'));
         return sb.toString();
+    }
+
+    /**
+     * The fix-loop primitive. The first call baselines against the current file and returns
+     * the errors already there (the ones to fix). Every later call reports only what changed
+     * since it last ran — a brand-new fingerprint, or an already-seen one that occurred again
+     * — and says so plainly when nothing did, which is the loop's "clean" signal.
+     */
+    private synchronized String errorsSinceLastCheck(boolean reset) throws IOException {
+        if (reset) {
+            seenRepeats.clear();
+            baselineTaken = false;
+        }
+        List<StReport> all = reports.read();
+        all.sort(Comparator.comparing(StReport::timestamp).reversed());
+
+        if (!baselineTaken) {
+            baselineTaken = true;
+            all.forEach(r -> seenRepeats.put(r.id(), r.repeats()));
+            if (all.isEmpty()) return "✓ No errors on file.";
+            StringBuilder sb = new StringBuilder(all.size() + " error(s) currently on file — start here:\n");
+            all.forEach(r -> appendErrorLine(sb, r));
+            sb.append("\nFix, re-run your app or tests, then call errors_since_last_check again to see what changed.");
+            return sb.toString();
+        }
+
+        List<StReport> fresh = new ArrayList<>();
+        List<StReport> recurring = new ArrayList<>();
+        for (StReport r : all) {
+            Integer prev = seenRepeats.get(r.id());
+            if (prev == null) fresh.add(r);
+            else if (r.repeats() > prev) recurring.add(r);
+            seenRepeats.put(r.id(), r.repeats());
+        }
+        if (fresh.isEmpty() && recurring.isEmpty()) return "✓ No new errors since your last check.";
+
+        StringBuilder sb = new StringBuilder();
+        if (!fresh.isEmpty()) {
+            sb.append("🆕 ").append(fresh.size()).append(" new:\n");
+            fresh.forEach(r -> appendErrorLine(sb, r));
+        }
+        if (!recurring.isEmpty()) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append("🔁 ").append(recurring.size()).append(" still occurring (a fix didn't take):\n");
+            recurring.forEach(r -> appendErrorLine(sb, r));
+        }
+        sb.append("\nget_report <id> for the full block.");
+        return sb.toString();
+    }
+
+    private static void appendErrorLine(StringBuilder sb, StReport r) {
+        sb.append('#').append(r.id()).append("  ").append(r.headline());
+        if (r.repeats() > 1) sb.append("  (×").append(r.repeats()).append(')');
+        sb.append('\n');
     }
 
     private String findSimilar(String query) throws IOException {
