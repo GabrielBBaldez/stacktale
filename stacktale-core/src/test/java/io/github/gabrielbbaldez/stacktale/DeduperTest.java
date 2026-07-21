@@ -112,4 +112,40 @@ class DeduperTest {
         assertThat(again.totalOccurrences()).isEqualTo(2);
         assertThat(again.firstSeenMillis()).isEqualTo(0);
     }
+
+    @Test
+    void windowRollsOverStrictlyPastItNotAtItsExactBoundary() {
+        AtomicLong now = new AtomicLong(100_000);
+        Deduper d = new Deduper(300_000, 60_000, now::get);
+        assertThat(d.decide("a1").kind()).isEqualTo(Kind.REPORT); // report at t=100_000
+        d.confirmReport("a1"); // clear the pending flag so the window edge, not #51, decides
+
+        now.set(400_000); // exactly one window after the report
+        assertThat(d.decide("a1").kind())
+                .as("at exactly windowMillis the window has not rolled over yet")
+                .isNotEqualTo(Kind.REPORT);
+
+        now.set(400_001); // one millisecond past the window
+        assertThat(d.decide("a1").kind())
+                .as("strictly past the window a fresh report is due")
+                .isEqualTo(Kind.REPORT);
+    }
+
+    @Test
+    void summaryThrottleFiresExactlyAtTheBoundaryNotBefore() {
+        AtomicLong now = new AtomicLong(0);
+        Deduper d = new Deduper(300_000, 60_000, now::get);
+        d.decide("a1"); // REPORT at t=0
+        d.confirmReport("a1");
+        now.set(1_000);
+        assertThat(d.decide("a1").kind()).isEqualTo(Kind.SUMMARY); // first repeat; lastSummary=1_000
+
+        now.set(60_000); // 59_000 since the last summary — one short of the throttle
+        assertThat(d.decide("a1").kind()).isEqualTo(Kind.SILENT);
+
+        now.set(61_000); // exactly summaryThrottleMillis since the last summary
+        assertThat(d.decide("a1").kind())
+                .as("a throttled summary is due exactly at the boundary")
+                .isEqualTo(Kind.SUMMARY);
+    }
 }

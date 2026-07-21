@@ -177,6 +177,22 @@ class StackDistillerTest {
         assertThat(d.frameLines().size()).isLessThanOrEqualTo(6);
     }
 
+    @Test
+    void collapsesAtExactlyThreeCyclesButNotTwo() {
+        // Pins the "≥ 3 cycles" threshold exactly: two identical frames render verbatim,
+        // a third tips it into the collapsed marker.
+        StackTraceElement loop = el("com.acme.Svc", "loop", "Svc.java", 9);
+        StackTraceElement main = el("com.acme.Main", "main", "Main.java", 1);
+
+        DistilledStack two = new StackDistiller(List.of("com.acme"))
+                .distill(withStack(new RuntimeException("x"), loop, loop, main));
+        assertThat(two.frameLines()).noneSatisfy(l -> assertThat(l).contains("recursive frames"));
+
+        DistilledStack three = new StackDistiller(List.of("com.acme"))
+                .distill(withStack(new RuntimeException("x"), loop, loop, loop, main));
+        assertThat(three.frameLines()).anySatisfy(l -> assertThat(l).contains("recursive frames"));
+    }
+
     private static int recurse(int depth) {
         return recurse(depth + 1);
     }

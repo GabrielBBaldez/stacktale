@@ -43,6 +43,26 @@ CI also runs `scripts/check-readme-compat.sh`, which fails when the README's
 the build actually tests — the pom properties and the `compat.yml` matrix. If
 that check fails after a dependency bump, update the table in `README.md`.
 
+## Mutation testing (`stacktale-core`)
+
+Line coverage says a line ran; a mutation score says the tests would actually
+*catch* a regression in it. `stacktale-core` is the pure-logic module (dedup
+windows, stack distilling, redaction), so it's the one worth mutation-testing.
+Run it on demand — it is **not** a CI gate:
+
+```bash
+mvn -pl stacktale-core test-compile org.pitest:pitest-maven:mutationCoverage
+# report: stacktale-core/target/pit-reports/index.html
+```
+
+Baseline (JUnit 6, PIT 1.20): **test strength ≈ 85%** — of the mutations the
+core's own unit tests reach, 85% are killed. Overall mutation coverage reads
+lower (~66%) because a chunk of core is exercised only through the framework
+adapters' integration tests (in `stacktale`, `stacktale-log4j2`, …), which a
+core-only run doesn't execute, so those mutations show as *no coverage* here
+rather than as gaps. When you touch the pipeline's tricky paths, re-run PIT and
+kill the survivors your change introduces.
+
 ## The one rule that matters: the report format is a public API
 
 The `st/1` report format is specified in [docs/FORMAT.md](docs/FORMAT.md) and pinned by
