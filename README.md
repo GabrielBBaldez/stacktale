@@ -102,20 +102,20 @@ All artifacts are on Maven Central.
 <dependency>
   <groupId>io.github.gabrielbbaldez</groupId>
   <artifactId>stacktale-spring-boot-starter</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
 **Gradle (Groovy)**
 
 ```groovy
-implementation 'io.github.gabrielbbaldez:stacktale-spring-boot-starter:0.4.0'
+implementation 'io.github.gabrielbbaldez:stacktale-spring-boot-starter:0.5.0'
 ```
 
 **Gradle (Kotlin DSL)**
 
 ```kotlin
-implementation("io.github.gabrielbbaldez:stacktale-spring-boot-starter:0.4.0")
+implementation("io.github.gabrielbbaldez:stacktale-spring-boot-starter:0.5.0")
 ```
 
 That's it — no logback.xml editing. The starter registers the appender on the root
@@ -154,20 +154,20 @@ written in Kotlin or Java.
 <dependency>
   <groupId>io.github.gabrielbbaldez</groupId>
   <artifactId>stacktale</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
 **Gradle (Groovy)**
 
 ```groovy
-implementation 'io.github.gabrielbbaldez:stacktale:0.4.0'
+implementation 'io.github.gabrielbbaldez:stacktale:0.5.0'
 ```
 
 **Gradle (Kotlin DSL)**
 
 ```kotlin
-implementation("io.github.gabrielbbaldez:stacktale:0.4.0")
+implementation("io.github.gabrielbbaldez:stacktale:0.5.0")
 ```
 
 ```xml
@@ -190,20 +190,20 @@ itself on startup, and the file header explains the format to any AI that opens 
 <dependency>
   <groupId>io.github.gabrielbbaldez</groupId>
   <artifactId>stacktale-log4j2</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
 **Gradle (Groovy)**
 
 ```groovy
-implementation 'io.github.gabrielbbaldez:stacktale-log4j2:0.4.0'
+implementation 'io.github.gabrielbbaldez:stacktale-log4j2:0.5.0'
 ```
 
 **Gradle (Kotlin DSL)**
 
 ```kotlin
-implementation("io.github.gabrielbbaldez:stacktale-log4j2:0.4.0")
+implementation("io.github.gabrielbbaldez:stacktale-log4j2:0.5.0")
 ```
 
 ```xml
