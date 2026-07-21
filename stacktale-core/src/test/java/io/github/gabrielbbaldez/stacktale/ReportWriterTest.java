@@ -6,6 +6,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,6 +77,48 @@ class ReportWriterTest {
         assertThat(Files.readString(dir.resolve("errors-ai.log.2"), StandardCharsets.UTF_8)).contains("b");
         assertThat(Files.readString(dir.resolve("errors-ai.log.3"), StandardCharsets.UTF_8)).contains("a");
         assertThat(Files.exists(dir.resolve("errors-ai.log.4"))).isFalse();
+    }
+
+    @Test
+    void degradesToAppendingPastTheCapWhenRotationIsBlocked(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("errors-ai.log");
+        List<String> warnings = new ArrayList<>();
+        ReportWriter w = new ReportWriter(file, 40, "# h\n", null, false, 1, (m, t) -> warnings.add(m));
+        w.append("a".repeat(30) + "\n");
+        // stand in for a Windows reader holding the live file: an existing sibling makes the
+        // rotation's rename fail, exactly as a locked handle would
+        Files.createDirectory(dir.resolve("errors-ai.log.rotating"));
+
+        w.append("b".repeat(30) + "\n"); // would exceed the cap → rotation blocked
+
+        // nothing dropped, nothing wiped, no bogus backup, one warning
+        String content = Files.readString(file, StandardCharsets.UTF_8);
+        assertThat(content).contains("a").contains("b");
+        assertThat(Files.exists(dir.resolve("errors-ai.log.1"))).isFalse();
+        assertThat(warnings).hasSize(1);
+        assertThat(warnings.get(0)).contains("could not rotate");
+
+        // the reader releases → the next report rotates normally, and the file recovers
+        Files.delete(dir.resolve("errors-ai.log.rotating"));
+        w.append("c".repeat(30) + "\n");
+        assertThat(Files.exists(dir.resolve("errors-ai.log.1"))).isTrue();
+        assertThat(warnings).hasSize(1); // recovery is silent, not a second warning
+    }
+
+    @Test
+    void warnsOnlyOnceWhileRotationStaysBlocked(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("errors-ai.log");
+        List<String> warnings = new ArrayList<>();
+        ReportWriter w = new ReportWriter(file, 40, "# h\n", null, false, 1, (m, t) -> warnings.add(m));
+        w.append("a".repeat(30) + "\n");
+        Files.createDirectory(dir.resolve("errors-ai.log.rotating"));
+
+        w.append("b".repeat(30) + "\n");
+        w.append("c".repeat(30) + "\n");
+        w.append("d".repeat(30) + "\n");
+
+        assertThat(warnings).hasSize(1); // rate-limited: one warning for the whole episode
+        assertThat(Files.readString(file, StandardCharsets.UTF_8)).contains("b").contains("c").contains("d");
     }
 
     @Test

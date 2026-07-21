@@ -195,7 +195,7 @@ public final class ReportPipeline {
         try {
             String marker = renderer.sessionMarker(System.currentTimeMillis(), ProcessHandle.current().pid());
             writer = new ReportWriter(Path.of(settings.file()), settings.maxFileBytes(), renderer.fileHeader(),
-                    marker, settings.truncateOnStart(), settings.maxBackups());
+                    marker, settings.truncateOnStart(), settings.maxBackups(), host::warn);
         } catch (RuntimeException e) {
             host.warn("invalid report file '" + settings.file() + "', stacktale disabled", e);
             writer = null;
