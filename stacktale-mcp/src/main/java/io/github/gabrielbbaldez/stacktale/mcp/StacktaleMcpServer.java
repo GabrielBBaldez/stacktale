@@ -185,7 +185,7 @@ public final class StacktaleMcpServer {
         ObjectNode contents = result.putArray("contents").addObject();
         contents.put("uri", uri);
         contents.put("mimeType", "text/plain");
-        contents.put("text", listErrors(50)); // the "what's there now" view; get_report for full blocks
+        contents.put("text", listErrors(50).text()); // the "what's there now" view; get_report for full blocks
         return result;
     }
 
@@ -295,33 +295,41 @@ public final class StacktaleMcpServer {
         ArrayNode tools = result.putArray("tools");
         tools.add(tool("list_errors", "List error reports", true,
                 "List stacktale error reports (newest first): id, timestamp, headline, repeat count.",
-                "{\"type\":\"object\",\"properties\":{\"limit\":{\"type\":\"integer\",\"description\":\"max entries, default 20\"}}}"));
+                "{\"type\":\"object\",\"properties\":{\"limit\":{\"type\":\"integer\",\"description\":\"max entries, default 20\"}}}",
+                REPORTS_SCHEMA));
         tools.add(tool("get_report", "Get a full report", true,
                 "Get the full st/1 report block for one error id (story, fields, distilled stack, env).",
-                "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"description\":\"report id, e.g. c73cf755\"}},\"required\":[\"id\"]}"));
+                "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"description\":\"report id, e.g. c73cf755\"}},\"required\":[\"id\"]}",
+                null));
         tools.add(tool("errors_since", "Errors since a time", true,
                 "Full report blocks with timestamp >= the given moment (format: yyyy-MM-dd HH:mm:ss).",
-                "{\"type\":\"object\",\"properties\":{\"since\":{\"type\":\"string\",\"description\":\"e.g. 2026-07-10 11:00:00\"}},\"required\":[\"since\"]}"));
+                "{\"type\":\"object\",\"properties\":{\"since\":{\"type\":\"string\",\"description\":\"e.g. 2026-07-10 11:00:00\"}},\"required\":[\"since\"]}",
+                REPORTS_SCHEMA));
         tools.add(tool("find_similar_errors", "Find similar errors", true,
                 "Find past reports similar to an exception headline or stack snippet, ranked by root-cause type + digit-normalized message. Answers \"have we seen this before?\".",
-                "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"an exception headline or stack snippet, e.g. 'NullPointerException: customer is null'\"}},\"required\":[\"query\"]}"));
+                "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"an exception headline or stack snippet, e.g. 'NullPointerException: customer is null'\"}},\"required\":[\"query\"]}",
+                REPORTS_SCHEMA));
         // NOT idempotent: it advances the per-session cursor.
         tools.add(tool("errors_since_last_check", "Check for new errors", false,
                 "The fix-loop primitive. First call shows the errors currently on file; after you re-run the app/tests, it reports what's 🆕 new or 🔁 still occurring since your last call — or '✓ No new errors' when it's clean. Call it each round of a fix→run→check loop until clean. Optional reset re-baselines.",
-                "{\"type\":\"object\",\"properties\":{\"reset\":{\"type\":\"boolean\",\"description\":\"forget what was already reported and re-baseline from the current file\"}}}"));
+                "{\"type\":\"object\",\"properties\":{\"reset\":{\"type\":\"boolean\",\"description\":\"forget what was already reported and re-baseline from the current file\"}}}",
+                LOOP_SCHEMA));
         tools.add(tool("match_report", "Match a pasted trace", true,
                 "Paste a raw exception + stack trace and get the full stacktale report captured for it (story, fields, distilled stack, env) — matched by root-cause type and message. The bridge from a pasted trace to the agent having the whole context.",
-                "{\"type\":\"object\",\"properties\":{\"trace\":{\"type\":\"string\",\"description\":\"a pasted exception and its stack trace\"}},\"required\":[\"trace\"]}"));
+                "{\"type\":\"object\",\"properties\":{\"trace\":{\"type\":\"string\",\"description\":\"a pasted exception and its stack trace\"}},\"required\":[\"trace\"]}",
+                null));
         return result;
     }
 
     /** Every tool here only reads the local report file — advertise that so clients can auto-approve. */
-    private JsonNode tool(String name, String title, boolean idempotent, String description, String schemaJson) {
+    private JsonNode tool(String name, String title, boolean idempotent, String description,
+                          String schemaJson, String outputSchemaJson) {
         try {
             ObjectNode tool = JSON.createObjectNode();
             tool.put("name", name);
             tool.put("description", description);
             tool.set("inputSchema", JSON.readTree(schemaJson));
+            if (outputSchemaJson != null) tool.set("outputSchema", JSON.readTree(outputSchemaJson));
             ObjectNode annotations = tool.putObject("annotations");
             annotations.put("title", title);
             annotations.put("readOnlyHint", true);
@@ -333,36 +341,76 @@ public final class StacktaleMcpServer {
         }
     }
 
+    // Output schemas for the tools that also return structuredContent (a summary of reports;
+    // the fix-loop tool adds a clean flag). get_report / match_report stay text-only.
+    private static final String REPORTS_SCHEMA =
+            "{\"type\":\"object\",\"required\":[\"reports\"],\"properties\":{\"reports\":{\"type\":\"array\","
+            + "\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+            + "\"timestamp\":{\"type\":\"string\"},\"headline\":{\"type\":\"string\"},"
+            + "\"repeats\":{\"type\":\"integer\"}}}}}}";
+    private static final String LOOP_SCHEMA =
+            "{\"type\":\"object\",\"required\":[\"clean\"],\"properties\":{\"clean\":{\"type\":\"boolean\"},"
+            + "\"new\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+            + "\"headline\":{\"type\":\"string\"},\"repeats\":{\"type\":\"integer\"}}}},"
+            + "\"recurring\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+            + "\"headline\":{\"type\":\"string\"},\"repeats\":{\"type\":\"integer\"}}}}}}";
+
+    /** A tool's answer: the human text (always) and optional structuredContent for parsers. */
+    private record ToolResult(String text, JsonNode structured) {
+        static ToolResult text(String t) {
+            return new ToolResult(t, null);
+        }
+    }
+
+    private ArrayNode reportSummaries(List<StReport> reports, boolean withTimestamp) {
+        ArrayNode arr = JSON.createArrayNode();
+        for (StReport r : reports) {
+            ObjectNode o = arr.addObject();
+            o.put("id", r.id());
+            if (withTimestamp) o.put("timestamp", r.timestamp());
+            o.put("headline", r.headline());
+            o.put("repeats", r.repeats());
+        }
+        return arr;
+    }
+
     private JsonNode toolsCall(JsonNode params) throws IOException {
         String name = params.path("name").asText();
         JsonNode args = params.path("arguments");
-        String text = switch (name) {
+        ToolResult tr = switch (name) {
             case "list_errors" -> listErrors(args.path("limit").asInt(20));
-            case "get_report" -> getReport(args.path("id").asText());
+            case "get_report" -> ToolResult.text(getReport(args.path("id").asText()));
             case "errors_since" -> errorsSince(args.path("since").asText());
             case "find_similar_errors" -> findSimilar(args.path("query").asText());
             case "errors_since_last_check" -> errorsSinceLastCheck(args.path("reset").asBoolean(false));
-            case "match_report" -> matchReport(args.path("trace").asText());
+            case "match_report" -> ToolResult.text(matchReport(args.path("trace").asText()));
             default -> throw new IllegalArgumentException("unknown tool: " + name);
         };
         ObjectNode result = JSON.createObjectNode();
         ObjectNode content = result.putArray("content").addObject();
         content.put("type", "text");
-        content.put("text", text);
+        content.put("text", tr.text());
+        if (tr.structured() != null) result.set("structuredContent", tr.structured());
         return result;
     }
 
-    private String listErrors(int limit) throws IOException {
+    private ToolResult listErrors(int limit) throws IOException {
         List<StReport> all = reports.read();
-        if (all.isEmpty()) return "No error reports found.";
         all.sort(Comparator.comparing(StReport::timestamp).reversed());
+        List<StReport> shown = all.stream().limit(limit).toList();
         StringBuilder sb = new StringBuilder();
-        all.stream().limit(limit).forEach(r -> sb.append('#').append(r.id())
-                .append("  ").append(r.timestamp())
-                .append(r.repeats() > 1 ? "  (×" + r.repeats() + ")" : "")
-                .append("  ").append(r.headline()).append('\n'));
-        if (all.size() > limit) sb.append("… ").append(all.size() - limit).append(" older reports (raise limit to see them)\n");
-        return sb.toString();
+        if (all.isEmpty()) {
+            sb.append("No error reports found.");
+        } else {
+            shown.forEach(r -> sb.append('#').append(r.id())
+                    .append("  ").append(r.timestamp())
+                    .append(r.repeats() > 1 ? "  (×" + r.repeats() + ")" : "")
+                    .append("  ").append(r.headline()).append('\n'));
+            if (all.size() > limit) sb.append("… ").append(all.size() - limit).append(" older reports (raise limit to see them)\n");
+        }
+        ObjectNode structured = JSON.createObjectNode();
+        structured.set("reports", reportSummaries(shown, true));
+        return new ToolResult(sb.toString(), structured);
     }
 
     private String getReport(String id) throws IOException {
@@ -373,17 +421,19 @@ public final class StacktaleMcpServer {
                 .orElse("No report with id '" + id + "'. Use list_errors to see available ids.");
     }
 
-    private String errorsSince(String since) throws IOException {
+    private ToolResult errorsSince(String since) throws IOException {
         LocalDateTime cutoff = LocalDateTime.parse(since.replace('T', ' ').substring(0, 19),
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         List<StReport> matching = reports.read().stream()
                 .filter(r -> !StReportFile.parseTimestamp(r.timestamp()).isBefore(cutoff))
                 .sorted(Comparator.comparing(StReport::timestamp))
                 .toList();
-        if (matching.isEmpty()) return "No reports since " + since + ".";
+        if (matching.isEmpty()) return ToolResult.text("No reports since " + since + ".");
         StringBuilder sb = new StringBuilder();
         matching.forEach(r -> sb.append(r.block()).append('\n'));
-        return sb.toString();
+        ObjectNode structured = JSON.createObjectNode();
+        structured.set("reports", reportSummaries(matching, true));
+        return new ToolResult(sb.toString(), structured);
     }
 
     /**
@@ -392,7 +442,7 @@ public final class StacktaleMcpServer {
      * since it last ran — a brand-new fingerprint, or an already-seen one that occurred again
      * — and says so plainly when nothing did, which is the loop's "clean" signal.
      */
-    private synchronized String errorsSinceLastCheck(boolean reset) throws IOException {
+    private synchronized ToolResult errorsSinceLastCheck(boolean reset) throws IOException {
         if (reset) {
             seenRepeats.clear();
             baselineTaken = false;
@@ -403,11 +453,17 @@ public final class StacktaleMcpServer {
         if (!baselineTaken) {
             baselineTaken = true;
             all.forEach(r -> seenRepeats.put(r.id(), r.repeats()));
-            if (all.isEmpty()) return "✓ No errors on file.";
-            StringBuilder sb = new StringBuilder(all.size() + " error(s) currently on file — start here:\n");
-            all.forEach(r -> appendErrorLine(sb, r));
-            sb.append("\nFix, re-run your app or tests, then call errors_since_last_check again to see what changed.");
-            return sb.toString();
+            String text;
+            if (all.isEmpty()) {
+                text = "✓ No errors on file.";
+            } else {
+                StringBuilder sb = new StringBuilder(all.size() + " error(s) currently on file — start here:\n");
+                all.forEach(r -> appendErrorLine(sb, r));
+                sb.append("\nFix, re-run your app or tests, then call errors_since_last_check again to see what changed.");
+                text = sb.toString();
+            }
+            // the current errors are what's "new to you"; clean only if there are none
+            return new ToolResult(text, loopStructured(all.isEmpty(), all, List.of()));
         }
 
         List<StReport> fresh = new ArrayList<>();
@@ -418,20 +474,33 @@ public final class StacktaleMcpServer {
             else if (r.repeats() > prev) recurring.add(r);
             seenRepeats.put(r.id(), r.repeats());
         }
-        if (fresh.isEmpty() && recurring.isEmpty()) return "✓ No new errors since your last check.";
+        boolean clean = fresh.isEmpty() && recurring.isEmpty();
+        String text;
+        if (clean) {
+            text = "✓ No new errors since your last check.";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            if (!fresh.isEmpty()) {
+                sb.append("🆕 ").append(fresh.size()).append(" new:\n");
+                fresh.forEach(r -> appendErrorLine(sb, r));
+            }
+            if (!recurring.isEmpty()) {
+                if (sb.length() > 0) sb.append('\n');
+                sb.append("🔁 ").append(recurring.size()).append(" still occurring (a fix didn't take):\n");
+                recurring.forEach(r -> appendErrorLine(sb, r));
+            }
+            sb.append("\nget_report <id> for the full block.");
+            text = sb.toString();
+        }
+        return new ToolResult(text, loopStructured(clean, fresh, recurring));
+    }
 
-        StringBuilder sb = new StringBuilder();
-        if (!fresh.isEmpty()) {
-            sb.append("🆕 ").append(fresh.size()).append(" new:\n");
-            fresh.forEach(r -> appendErrorLine(sb, r));
-        }
-        if (!recurring.isEmpty()) {
-            if (sb.length() > 0) sb.append('\n');
-            sb.append("🔁 ").append(recurring.size()).append(" still occurring (a fix didn't take):\n");
-            recurring.forEach(r -> appendErrorLine(sb, r));
-        }
-        sb.append("\nget_report <id> for the full block.");
-        return sb.toString();
+    private JsonNode loopStructured(boolean clean, List<StReport> fresh, List<StReport> recurring) {
+        ObjectNode structured = JSON.createObjectNode();
+        structured.put("clean", clean);
+        structured.set("new", reportSummaries(fresh, false));
+        structured.set("recurring", reportSummaries(recurring, false));
+        return structured;
     }
 
     private static void appendErrorLine(StringBuilder sb, StReport r) {
@@ -480,17 +549,19 @@ public final class StacktaleMcpServer {
         return root == null ? trace : root;
     }
 
-    private String findSimilar(String query) throws IOException {
-        if (query == null || query.isBlank()) return "Provide an exception headline or stack snippet to match against.";
+    private ToolResult findSimilar(String query) throws IOException {
+        if (query == null || query.isBlank()) return ToolResult.text("Provide an exception headline or stack snippet to match against.");
         List<StReport> ranked = rank(query, reports.read(), 5);
-        if (ranked.isEmpty()) return "No similar reports found.";
+        if (ranked.isEmpty()) return ToolResult.text("No similar reports found.");
         StringBuilder sb = new StringBuilder("Most similar reports first:\n");
         ranked.forEach(r -> sb.append('#').append(r.id())
                 .append("  ").append(r.timestamp())
                 .append(r.repeats() > 1 ? "  (×" + r.repeats() + ")" : "")
                 .append("  ").append(r.headline()).append('\n'));
         sb.append("\nUse get_report <id> for the full block.");
-        return sb.toString();
+        ObjectNode structured = JSON.createObjectNode();
+        structured.set("reports", reportSummaries(ranked, true));
+        return new ToolResult(sb.toString(), structured);
     }
 
     /** Reports ranked by similarity to {@code query} (an exception headline or stack snippet). */

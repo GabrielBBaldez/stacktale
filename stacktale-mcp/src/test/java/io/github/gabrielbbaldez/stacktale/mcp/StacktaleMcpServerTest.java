@@ -172,6 +172,26 @@ class StacktaleMcpServerTest {
     }
 
     @Test
+    void toolsCarryStructuredContent() throws Exception {
+        // list_errors → { reports: [ {id, headline, repeats, timestamp} ] }
+        JsonNode[] r = roundTrip(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"list_errors\",\"arguments\":{}}}");
+        JsonNode reports = r[0].at("/result/structuredContent/reports");
+        assertThat(reports.isArray()).isTrue();
+        assertThat(reports).isNotEmpty();
+        assertThat(reports.get(0).at("/id").asText()).isNotBlank();
+        assertThat(reports.get(0).at("/headline").asText()).isNotBlank();
+
+        // errors_since_last_check → { clean, new, recurring }; ST_FILE has errors so not clean
+        JsonNode[] loop = roundTrip(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"errors_since_last_check\",\"arguments\":{}}}");
+        JsonNode sc = loop[0].at("/result/structuredContent");
+        assertThat(sc.at("/clean").asBoolean()).isFalse();
+        assertThat(sc.at("/new").isArray()).isTrue();
+        assertThat(sc.at("/recurring").isArray()).isTrue();
+    }
+
+    @Test
     void toolsAdvertiseReadOnlyAnnotations() throws Exception {
         JsonNode[] r = roundTrip(
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}");
@@ -180,6 +200,12 @@ class StacktaleMcpServerTest {
             assertThat(t.at("/annotations/readOnlyHint").asBoolean()).isTrue();  // all read the file only
             assertThat(t.at("/annotations/title").asText()).isNotBlank();
         });
+        // the loop tool declares an outputSchema for its structured result
+        JsonNode loopTool = null;
+        for (JsonNode t : tools) {
+            if ("errors_since_last_check".equals(t.get("name").asText())) loopTool = t;
+        }
+        assertThat(loopTool.at("/outputSchema/properties/clean").isObject()).isTrue();
         JsonNode loop = null;
         for (JsonNode t : tools) {
             if ("errors_since_last_check".equals(t.get("name").asText())) loop = t;
