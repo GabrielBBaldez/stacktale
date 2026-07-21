@@ -18,6 +18,9 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: maven
       - run: mvn -B verify
+      - name: README compatibility table guard
+        if: matrix.java == 21
+        run: bash scripts/check-readme-compat.sh
       - name: Coverage summary
         if: matrix.java == 21
         run: |

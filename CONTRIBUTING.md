@@ -38,6 +38,11 @@ mvn verify        # JDK 17+ (CI runs 17 and 21)
 The full suite must be green before a PR. Coverage report lands in
 `target/site/jacoco/index.html`.
 
+CI also runs `scripts/check-readme-compat.sh`, which fails when the README's
+**Compatibility** table disagrees (at major.minor precision) with the versions
+the build actually tests — the pom properties and the `compat.yml` matrix. If
+that check fails after a dependency bump, update the table in `README.md`.
+
 ## The one rule that matters: the report format is a public API
 
 The `st/1` report format is specified in [docs/FORMAT.md](docs/FORMAT.md) and pinned by
