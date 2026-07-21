@@ -5,6 +5,76 @@ All notable changes to stacktale are documented here. The format follows
 [SemVer](https://semver.org/). The report format (`st/1`) is versioned independently
 and pinned by golden-file tests.
 
+## [0.5.0] — 2026-07-20
+
+Any framework, or none. New backends, a machine-readable format, and a durability pass on
+the road to 1.0.
+
+### ⚠️ Upgrading from 0.4.x
+
+The Logback appender moved into its own package for JPMS. If you register it in
+`logback.xml`, change the class from
+`io.github.gabrielbbaldez.stacktale.StacktaleAppender` to
+`io.github.gabrielbbaldez.stacktale.logback.StacktaleAppender`. The Spring Boot starter and
+the Log4j2 / JUL handlers are unaffected.
+
+### Added
+
+- **`stacktale-jul`** (new module): a `java.util.logging` / `System.Logger` handler — the
+  same `st/1` reports with neither SLF4J nor Logback on the classpath. "Any framework, or
+  none" is now literal (#49), with the same optional uncaught-exception funnel as the other
+  backends (#55).
+- **JSON output** (`st-json/1`): `format=json` writes NDJSON — one addressable JSON object
+  per entry, for parsers, pipelines and dashboards rather than an LLM reading raw text. The
+  text format stays the default (denser per token) (#50).
+- **SLF4J 2.0 key-values**: `log.atError().addKeyValue("orderId", 889)…` is captured into
+  the report context and redacted just like MDC (#93).
+- **Correlation-preserving redaction** (opt-in): a masked value can carry a stable keyed
+  suffix `███(a1b2)`, so an AI can tell whether the *same* secret keeps recurring without
+  the value ever being exposed — a one-way, per-process HMAC (#48).
+- **JPMS**: every jar declares a stable `Automatic-Module-Name` and works on the module
+  path; a resolution smoke test in CI pins it (#44).
+- **GraalVM native-image**: reachability metadata plus a `docs/native.md` guide; field
+  reflection degrades to empty under a closed configuration instead of failing (#45).
+- **OpenTelemetry coexistence**: the agent runs cleanly behind the OTel javaagent, with an
+  integration test that loads both and confirms captures still fire (#46).
+- **MCP**: a `find_similar_errors` tool ranks past reports by root type and digit-normalized
+  message (#67); the file watcher debounces bursts (#66); a two-minute JBang setup path
+  (#69).
+- **Docs & community**: `SECURITY.md` with a threat model (#94), a `CODE_OF_CONDUCT.md`
+  (#102), a pull-request template (#103), an FAQ (#99), a Kotlin quickstart (#90), Gradle
+  snippets (#91), and an expanded configuration reference (#72).
+
+### Changed
+
+- **Log4j2 2.26**, **JUnit 6**, and a dependency refresh via Dependabot.
+- The story's per-thread fallback is now a bounded LRU keyed by thread *name*, replacing an
+  unbounded `ThreadLocal` that could retain context on pooled threads (#52).
+
+### Fixed
+
+- **Durability & concurrency hardening** (#57): a rotation blocked by a reader holding the
+  file (Windows) now degrades to appending past the cap and retries, instead of silently
+  disabling reporting; no write truncates, so a stray second writer can't wipe another
+  process's data; `Deduper.rollback` keeps the session recurrence count; the storm counter
+  clears only after a durable write.
+- **JSON renderer** no longer leaked a secret-named field's value (#53).
+- **Log4j2** now honors configured `containerLoggers` for echo suppression (#54).
+- **Spring starter**: the request-line logger no longer leaks into the story of later,
+  unrelated errors (#56).
+- **Dedup**: a report awaiting a durable write stays silent rather than emitting a duplicate
+  or an orphan summary, and a rolled-back window re-arms cleanly (#51).
+
+### Thanks
+
+First contributions to stacktale from **[@Abdul-Rafy2005](https://github.com/Abdul-Rafy2005)**
+(configuration reference #72, Gradle snippets #91),
+**[@ANONYMOUSZED-beep](https://github.com/ANONYMOUSZED-beep)** (Kotlin quickstart #90), and
+**[@Klopez851](https://github.com/Klopez851)** (the FAQ #99). Thank you — the docs read
+better because of you.
+
+[0.5.0]: https://github.com/stacktale/stacktale/releases/tag/v0.5.0
+
 ## [0.4.0] — 2026-07-10
 
 Production hardening and the agentic loop.
