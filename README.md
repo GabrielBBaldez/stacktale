@@ -303,9 +303,10 @@ One `stacktale-core`, every entry point — add only the ones your stack uses:
 | **AI assistants (MCP)** | `stacktale-mcp` — read reports as tools in Claude Code / Cursor |
 | **Throw-site arguments** | `stacktale-agent` — an optional `-javaagent` capturing method args |
 | **IntelliJ IDEA / JetBrains** | [**stacktale-intellij**](https://github.com/stacktale/stacktale-intellij) — a tool window over `errors-ai.log`: reports newest-first, double-click to jump to the culprit line, copy-for-AI |
+| **VS Code / Cursor / Windsurf** | [**stacktale-vscode**](https://github.com/stacktale/stacktale-vscode) — the same view in the activity bar: reports newest-first, click to jump to the culprit, copy-for-AI |
 
 Every library module is Java 17+, [JPMS](#java-modules-jpms)-ready and [GraalVM-native](docs/native.md)-ready.
-On the roadmap: idiomatic starters for **Micronaut** (#81) and **Quarkus** (#82) — both already usable today through the Logback / JUL adapters — plus a **VS Code extension** (#70) and a **`stacktale` CLI** (#71).
+On the roadmap: idiomatic starters for **Micronaut** (#81) and **Quarkus** (#82) — both already usable today through the Logback / JUL adapters — plus a **`stacktale` CLI** (#71).
 
 ## What gets captured
 
