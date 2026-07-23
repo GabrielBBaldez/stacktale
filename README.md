@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/stacktale/stacktale/actions/workflows/ci.yml"><img src="https://github.com/stacktale/stacktale/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/stacktale/stacktale"><img src="https://codecov.io/gh/stacktale/stacktale/graph/badge.svg" alt="Coverage"></a>
   <a href="https://central.sonatype.com/artifact/io.github.gabrielbbaldez/stacktale"><img src="https://img.shields.io/maven-central/v/io.github.gabrielbbaldez/stacktale" alt="Maven Central"></a>
   <img src="https://img.shields.io/badge/Java-17%2B-orange" alt="Java 17+">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0">
